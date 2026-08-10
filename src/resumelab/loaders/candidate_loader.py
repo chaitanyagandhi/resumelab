@@ -21,6 +21,7 @@ from pydantic import ValidationError
 from resumelab.exceptions import CandidateProfileError
 from resumelab.models.candidate import CandidateProfile
 from resumelab.utils.errors import describe_validation_error
+from resumelab.utils.files import read_text_file
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,13 @@ def load_candidate_profile(path: Path) -> CandidateProfile:
     """
     logger.info("loading candidate profile path=%s", path)
 
-    document = _parse_yaml(_read_text(path), path)
+    text = read_text_file(
+        path,
+        subject="Candidate profile",
+        error_type=CandidateProfileError,
+        missing_hint=f"Create it with: cp {EXAMPLE_PROFILE_PATH} {path}",
+    )
+    document = _parse_yaml(text, path)
     try:
         profile = CandidateProfile.model_validate(document)
     except ValidationError as exc:
@@ -57,29 +64,6 @@ def load_candidate_profile(path: Path) -> CandidateProfile:
         len(profile.education),
     )
     return profile
-
-
-def _read_text(path: Path) -> str:
-    """Read the profile as UTF-8, translating filesystem failures into domain errors."""
-    try:
-        return path.read_text(encoding="utf-8")
-    except FileNotFoundError as exc:
-        raise CandidateProfileError(
-            f"Candidate profile not found: {path}\n"
-            f"  Create it with: cp {EXAMPLE_PROFILE_PATH} {path}"
-        ) from exc
-    except IsADirectoryError as exc:
-        raise CandidateProfileError(
-            f"Candidate profile path is a directory, not a file: {path}"
-        ) from exc
-    except PermissionError as exc:
-        raise CandidateProfileError(f"Candidate profile is not readable: {path}") from exc
-    except UnicodeDecodeError as exc:
-        raise CandidateProfileError(
-            f"Candidate profile must be UTF-8 encoded: {path}\n  {exc.reason}"
-        ) from exc
-    except OSError as exc:
-        raise CandidateProfileError(f"Could not read candidate profile {path}: {exc}") from exc
 
 
 def _parse_yaml(text: str, path: Path) -> dict[Any, Any]:

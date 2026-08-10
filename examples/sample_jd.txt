@@ -1,0 +1,46 @@
+Northlake Systems — Software Engineer, Cloud Storage Infrastructure
+Sunnyvale, CA (Hybrid)
+
+About the role
+
+Northlake Systems builds the distributed storage platform behind large-scale
+analytics and AI training workloads. Our storage engineering team owns the data
+path: the services that place, replicate, and serve petabytes of customer data
+across thousands of nodes with predictable tail latency.
+
+We are looking for an early-career engineer to work on the control and data planes
+of our block and file storage products.
+
+What you will do
+
+- Design and implement services in Go and Java that manage volume placement,
+  replication, and failure recovery across storage clusters.
+- Work close to the operating system: Linux storage stack, NVMe devices, SSD
+  endurance characteristics, and kernel-level I/O behavior.
+- Extend our support for network storage protocols including NFS, SMB, iSCSI, and
+  NVMe-oF.
+- Build observability into the data path — metrics, tracing, and tooling that make
+  latency regressions obvious before customers notice them.
+- Participate in design reviews for distributed systems problems: consensus,
+  quorum, partition tolerance, and consistency trade-offs.
+- Improve performance through profiling, benchmarking, and careful measurement
+  rather than guesswork.
+
+What we are looking for
+
+- BS or MS in Computer Science or equivalent practical experience.
+- Proficiency in at least one systems language: Go, C, C++, or Java.
+- Solid grounding in Linux, networking fundamentals, and concurrent programming.
+- Familiarity with distributed systems concepts and their failure modes.
+- Experience with benchmarking, profiling, and performance analysis.
+- Strong written communication; we operate through design documents.
+
+Nice to have
+
+- Exposure to storage protocols (NFS, SMB, iSCSI, NVMe-oF) or filesystem internals.
+- Experience with Kubernetes, Terraform, or infrastructure automation.
+- Contributions to open-source infrastructure projects.
+- Familiarity with RAID, erasure coding, or data durability modeling.
+
+Northlake Systems is a fictional company. This posting exists solely as example
+input for the ResumeLab research prototype.

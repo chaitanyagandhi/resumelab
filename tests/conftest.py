@@ -30,6 +30,12 @@ def isolated_environment(monkeypatch):
 
 
 @pytest.fixture(scope="session")
+def repo_root():
+    """Root of the repository, for tests that read tracked example files."""
+    return REPO_ROOT
+
+
+@pytest.fixture(scope="session")
 def profile_template_path():
     """Path to the unpopulated candidate profile template tracked in the repository."""
     return REPO_ROOT / "data" / "candidate_profile.example.yaml"
