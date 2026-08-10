@@ -1,8 +1,13 @@
 """Shared pytest fixtures."""
 
+from dataclasses import dataclass
 from pathlib import Path
 
 import pytest
+
+from resumelab.llm.client import LLMCallStats, TokenUsage
+from resumelab.models.analysis import JobAnalysis
+from resumelab.models.job import JobDescription, JobDescriptionSource
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -32,6 +37,108 @@ def isolated_environment(monkeypatch):
     """
     for name in SETTINGS_ENV_VARS:
         monkeypatch.delenv(name, raising=False)
+
+
+@dataclass
+class RecordedCall:
+    """One captured request to the fake client."""
+
+    system_prompt: str
+    user_prompt: str
+    response_model: type
+    purpose: str
+
+
+class RecordingLLMClient:
+    """A deterministic :class:`~resumelab.llm.client.LLMClient` for pipeline tests.
+
+    Returns queued responses in order and records every request, so a stage can be
+    tested on what it asked for as well as what it did with the answer. Raises queued
+    exceptions, which is how failure paths are exercised.
+    """
+
+    def __init__(self, responses, *, model="fake-model-1"):
+        self._responses = list(responses)
+        self._model = model
+        self.calls: list[RecordedCall] = []
+        self.stats = LLMCallStats()
+
+    @property
+    def model(self) -> str:
+        return self._model
+
+    def generate_structured(self, *, system_prompt, user_prompt, response_model, purpose):
+        self.calls.append(
+            RecordedCall(
+                system_prompt=system_prompt,
+                user_prompt=user_prompt,
+                response_model=response_model,
+                purpose=purpose,
+            )
+        )
+        self.stats = self.stats.record(TokenUsage(1, 1, 2))
+        if not self._responses:
+            raise AssertionError(f"no queued response for purpose={purpose!r}")
+        response = self._responses.pop(0)
+        if isinstance(response, Exception):
+            raise response
+        return response
+
+    @property
+    def last_call(self) -> RecordedCall:
+        return self.calls[-1]
+
+
+@pytest.fixture
+def make_llm_client():
+    """Factory for :class:`RecordingLLMClient`, so tests need no cross-module import."""
+    return RecordingLLMClient
+
+
+@pytest.fixture
+def job_description():
+    """A storage-infrastructure posting, matching the shipped example's archetype."""
+    return JobDescription(
+        text=(
+            "Software Engineer, Cloud Storage Infrastructure at Northlake Systems. "
+            "Design services in Go and Java that manage volume placement and "
+            "replication across storage clusters. Work close to the Linux storage "
+            "stack, NVMe devices, and network storage protocols including NFS, SMB, "
+            "iSCSI, and NVMe-oF."
+        ),
+        source=JobDescriptionSource.TEXT,
+    )
+
+
+@pytest.fixture
+def job_analysis():
+    """A plausible analysis of the storage posting above."""
+    return JobAnalysis(
+        company="Northlake Systems",
+        role_title="Software Engineer, Cloud Storage Infrastructure",
+        role_archetype="storage infrastructure engineer",
+        seniority="early-career",
+        core_languages=("Go", "Java", "C"),
+        frameworks=(),
+        infrastructure=("Linux", "NVMe", "Kubernetes"),
+        databases=(),
+        ai_ml_concepts=(),
+        domain_concepts=("network storage protocols", "NFS", "SMB", "iSCSI", "NVMe-oF"),
+        engineering_concepts=("distributed consensus", "latency profiling"),
+        responsibilities=("Design volume placement and replication services",),
+        high_priority_requirements=("Proficiency in a systems language", "Linux fundamentals"),
+        bonus_requirements=("Filesystem internals",),
+        soft_traits=("Communicates through design documents",),
+        high_value_keywords=("NVMe-oF", "distributed storage", "Go"),
+        technical_identity=(
+            "Early-career storage infrastructure engineer experienced with Go, Java, "
+            "Linux, distributed storage systems, NVMe and network storage protocols."
+        ),
+        ideal_candidate_profile=(
+            "An engineer who has worked close to the operating system and reasons "
+            "about tail latency and failure modes in distributed storage."
+        ),
+    )
 
 
 @pytest.fixture(scope="session")

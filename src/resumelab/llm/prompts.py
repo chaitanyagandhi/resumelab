@@ -139,6 +139,56 @@ class Prompt:
         return "\n\n".join(section.render() for section in sections)
 
 
+JD_ANALYSIS_PROMPT: Final = Prompt(
+    name="jd_analysis",
+    version=JD_ANALYSIS_PROMPT_VERSION,
+    instructions="""\
+Read the job description and extract a structured analysis of it.
+
+Separate signal from boilerplate. Postings are padded with legal notices, benefits, \
+company mission statements, and generic phrases that appear in every listing. Those \
+carry no information about this role. Extract what distinguishes this posting from \
+any other engineering posting.
+
+Field guidance:
+- company, role_title: as stated. Use an empty string for company only if the \
+posting genuinely never names it.
+- role_archetype: the kind of engineer this is, in a few words, independent of the \
+posting's own title inflation. For example "storage infrastructure engineer", \
+"full stack GenAI engineer", "AI/backend systems engineer".
+- seniority: the level actually implied by the requirements, not just the title.
+- core_languages, frameworks, infrastructure, databases, ai_ml_concepts: named \
+technologies, split by kind. Record what the posting names, not what you assume \
+accompanies it.
+- domain_concepts: what this company's problem space is about, e.g. network storage \
+protocols, semantic retrieval, mortgage origination.
+- engineering_concepts: how they expect the work to be done, e.g. distributed \
+consensus, latency profiling, event-driven architecture.
+- responsibilities: what the person will actually do, phrased compactly.
+- high_priority_requirements: the requirements this role genuinely turns on. \
+bonus_requirements: the nice-to-haves. Keep these separate; conflating them destroys \
+the signal.
+- soft_traits: the working style the posting emphasizes, when it says anything \
+specific.
+- high_value_keywords: the terms whose presence in a resume would most change how \
+this employer reads it.
+
+The two fields that matter most:
+- technical_identity: one or two sentences describing the engineering identity that \
+would look maximally aligned with this posting. Write it as a description of a \
+person, naming the concrete technologies and problem domains that define them. \
+Example shape: "Early-career storage infrastructure engineer experienced with Go, \
+Java, Linux, distributed storage systems, NVMe and network storage protocols."
+- ideal_candidate_profile: what this employer is actually hoping to find, including \
+the experience and instincts a posting implies but does not state.
+
+Base every field on the posting itself. Where a posting is vague, infer what a \
+domain-experienced reader would infer, and keep it specific enough to act on.\
+""",
+)
+"""Reads a job description into :class:`~resumelab.models.analysis.JobAnalysis`."""
+
+
 def neutralize_fences(content: str) -> str:
     """Strip anything in ``content`` that could be mistaken for a fence marker.
 

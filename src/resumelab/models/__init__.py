@@ -1,5 +1,6 @@
 """Domain models for ResumeLab."""
 
+from resumelab.models.analysis import MAX_LIST_ITEMS, JobAnalysis
 from resumelab.models.candidate import (
     MIN_EXPERIENCE_BULLET_COUNT,
     REQUIRED_PROJECT_BULLET_COUNT,
@@ -20,6 +21,7 @@ from resumelab.models.job import (
 
 __all__ = [
     "MAX_JOB_DESCRIPTION_CHARACTERS",
+    "MAX_LIST_ITEMS",
     "MIN_EXPERIENCE_BULLET_COUNT",
     "MIN_JOB_DESCRIPTION_CHARACTERS",
     "REQUIRED_PROJECT_BULLET_COUNT",
@@ -27,6 +29,7 @@ __all__ = [
     "CandidateProfile",
     "Education",
     "Experience",
+    "JobAnalysis",
     "JobDescription",
     "JobDescriptionSource",
     "PersonalDetails",
