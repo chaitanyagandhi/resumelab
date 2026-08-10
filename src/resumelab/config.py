@@ -20,6 +20,7 @@ from pydantic import Field, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from resumelab.exceptions import ConfigurationError
+from resumelab.utils.errors import describe_validation_error
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
@@ -118,19 +119,9 @@ def load_settings(env_file: Path | str | None = DEFAULT_ENV_FILE) -> Settings:
         # alone, so it cannot see the private settings kwargs.
         return Settings(_env_file=env_file)  # type: ignore[call-arg]
     except ValidationError as exc:
-        raise ConfigurationError(_describe_validation_error(exc)) from exc
-
-
-def _describe_validation_error(exc: ValidationError) -> str:
-    """Render a readable, secret-free summary of a settings validation failure.
-
-    Pydantic's own string form embeds the offending input value, which could expose a
-    credential. Only the variable name and the reason are reported.
-    """
-    lines = [f"  {_env_var_name(error['loc'])}: {error['msg']}" for error in exc.errors()]
-    return "Invalid ResumeLab configuration:\n" + "\n".join(lines)
-
-
-def _env_var_name(loc: tuple[int | str, ...]) -> str:
-    """Map a pydantic error location back to its environment variable name."""
-    return ".".join(str(part) for part in loc).upper() if loc else "<unknown>"
+        message = describe_validation_error(
+            exc,
+            "Invalid ResumeLab configuration:",
+            uppercase_locations=True,
+        )
+        raise ConfigurationError(message) from exc
