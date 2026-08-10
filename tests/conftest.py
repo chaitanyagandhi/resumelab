@@ -31,8 +31,8 @@ def isolated_environment(monkeypatch):
 
 @pytest.fixture(scope="session")
 def profile_template_path():
-    """Path to the candidate profile template shipped in the repository."""
-    return REPO_ROOT / "data" / "candidate_profile.yaml"
+    """Path to the unpopulated candidate profile template tracked in the repository."""
+    return REPO_ROOT / "data" / "candidate_profile.example.yaml"
 
 
 @pytest.fixture

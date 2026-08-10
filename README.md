@@ -31,3 +31,13 @@ make check     # ruff lint + format check, mypy strict, pytest with coverage
 ```
 
 Run `make help` to list all targets.
+
+## Local setup
+
+Both files below hold private data and are git-ignored; only their `.example`
+counterparts are tracked.
+
+```bash
+cp .env.example .env                                              # add your API key
+cp data/candidate_profile.example.yaml data/candidate_profile.yaml # add your profile
+```

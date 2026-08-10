@@ -1,7 +1,15 @@
-# ResumeLab source candidate profile.
+# ResumeLab source candidate profile — TEMPLATE.
 #
-# This file is the experimental control. It is read at the start of every run and is
-# NEVER written to during generation, so that each experiment can be analyzed as
+# This file is tracked in Git and must stay unpopulated. To use ResumeLab:
+#
+#   cp data/candidate_profile.example.yaml data/candidate_profile.yaml
+#
+# then fill in the copy. Everything under data/ except this template is git-ignored,
+# so real contact details and work history never reach the remote repository.
+#
+# The populated profile is the experimental control. It is read at the start of every
+# run and is NEVER written to during generation, so that each experiment can be
+# analyzed as
 #   original profile  vs  target job description  vs  generated resume.
 #
 # Populate every field with real source material. Blank optional fields are treated

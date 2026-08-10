@@ -29,6 +29,13 @@ env/
 coverage.xml
 htmlcov/
 
+# --- Candidate data ---
+# The populated profile contains personal contact details and work history. Only the
+# unpopulated template is tracked; every other profile stays local.
+data/*.yaml
+data/*.yml
+!data/candidate_profile.example.yaml
+
 # --- Research output ---
 # Generated experiment runs and PDFs are reproducible artifacts, not source.
 # The directory itself is tracked via output/.gitkeep so the path always exists.
