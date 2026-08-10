@@ -1,0 +1,87 @@
+# ResumeLab source candidate profile.
+#
+# This file is the experimental control. It is read at the start of every run and is
+# NEVER written to during generation, so that each experiment can be analyzed as
+#   original profile  vs  target job description  vs  generated resume.
+#
+# Populate every field with real source material. Blank optional fields are treated
+# as absent; blank required fields are a validation error.
+#
+# The schema requires exactly three projects, each with exactly three bullets. Those
+# counts are the research design, defined in src/resumelab/models/candidate.py as
+# REQUIRED_PROJECT_COUNT and REQUIRED_PROJECT_BULLET_COUNT.
+#
+# Experience bullet counts are not fixed here — write as much source material as you
+# have, and let the generation stage decide how many bullets to emit.
+
+personal:
+  name: ""
+  email: ""
+  phone: ""
+  linkedin: ""
+  github: ""
+  location: ""
+
+education:
+  - institution: ""
+    degree: ""
+    field: ""
+    location: ""
+    start_date: ""
+    end_date: ""
+    gpa: ""
+    coursework: []
+
+experiences:
+  - company: ""
+    title: ""
+    location: ""
+    start_date: ""
+    end_date: ""
+    description: ""
+    bullets:
+      - ""
+      - ""
+      - ""
+
+projects:
+  - name: ""
+    subtitle: ""
+    date: ""
+    technologies: []
+    description: ""
+    bullets:
+      - ""
+      - ""
+      - ""
+
+  - name: ""
+    subtitle: ""
+    date: ""
+    technologies: []
+    description: ""
+    bullets:
+      - ""
+      - ""
+      - ""
+
+  - name: ""
+    subtitle: ""
+    date: ""
+    technologies: []
+    description: ""
+    bullets:
+      - ""
+      - ""
+      - ""
+
+skills:
+  programming_languages: []
+  frameworks: []
+  databases: []
+  cloud_devops: []
+  ai_ml: []
+  other: []
+
+# Optional. Awards, competitions, publications, scholarships.
+achievements: []
