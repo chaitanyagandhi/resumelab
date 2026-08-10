@@ -32,6 +32,17 @@ make check     # ruff lint + format check, mypy strict, pytest with coverage
 
 Run `make help` to list all targets.
 
+## Providers
+
+ResumeLab runs against **OpenAI** or **Anthropic**. The pipeline depends only on an
+`LLMClient` protocol, so the provider is a configuration choice rather than a code
+change, and both are recorded in each run's metadata for comparison.
+
+Set `LLM_PROVIDER` to pick one explicitly; leave it blank and the provider is inferred
+from whichever API key is configured. Note that current Claude models reject
+`temperature`, so the Anthropic adapter uses `ANTHROPIC_EFFORT` as the equivalent
+quality/cost dial.
+
 ## Local setup
 
 Both files below hold private data and are git-ignored; only their `.example`

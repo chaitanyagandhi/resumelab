@@ -1,22 +1,23 @@
 """Application configuration.
 
 Settings are read from the process environment, optionally seeded from a ``.env``
-file for local development. Secrets are never hardcoded and never printed: the API
-key is held as a :class:`~pydantic.SecretStr`, so it is redacted in reprs, logs, and
+file for local development. Secrets are never hardcoded and never printed: API keys
+are held as :class:`~pydantic.SecretStr`, so they are redacted in reprs, logs, and
 tracebacks.
 
 Configuration is loaded explicitly via :func:`load_settings` and passed down through
 the pipeline by dependency injection. There is deliberately no module-level singleton,
-which keeps tests isolated and lets a single process run several configurations (for
-example when comparing models in a future experiment).
+which keeps tests isolated and lets a single process run several configurations — for
+example when comparing providers or models in an experiment.
 """
 
 from __future__ import annotations
 
+from enum import StrEnum
 from pathlib import Path
 from typing import Final, Literal
 
-from pydantic import Field, SecretStr, ValidationError, field_validator
+from pydantic import Field, SecretStr, ValidationError, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from resumelab.exceptions import ConfigurationError
@@ -24,8 +25,18 @@ from resumelab.utils.errors import describe_validation_error
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
 
+EffortLevel = Literal["low", "medium", "high", "xhigh", "max"]
+"""Anthropic reasoning-depth control, the closest analogue to a temperature dial."""
+
 DEFAULT_ENV_FILE: Final = Path(".env")
 """Local development env file. Real deployments rely on the process environment."""
+
+
+class LLMProvider(StrEnum):
+    """Supported LLM providers, recorded in every run's metadata."""
+
+    OPENAI = "openai"
+    ANTHROPIC = "anthropic"
 
 
 class Settings(BaseSettings):
@@ -45,13 +56,35 @@ class Settings(BaseSettings):
         frozen=True,
     )
 
-    openai_api_key: SecretStr = Field(
-        description="OpenAI API key. Required; never logged or persisted.",
+    # --- provider selection -------------------------------------------------
+    llm_provider: LLMProvider | None = Field(
+        default=None,
+        description="Provider to use. When unset, inferred from the configured keys.",
+    )
+
+    # --- shared LLM behaviour ----------------------------------------------
+    llm_max_retries: int = Field(
+        default=3,
+        ge=0,
+        le=10,
+        description="Retry budget for transient API failures, using exponential backoff.",
+    )
+    llm_timeout_seconds: float = Field(
+        default=60.0,
+        gt=0.0,
+        le=600.0,
+        description="Per-request timeout applied to every LLM call.",
+    )
+
+    # --- OpenAI -------------------------------------------------------------
+    openai_api_key: SecretStr | None = Field(
+        default=None,
+        description="OpenAI API key. Required when the provider is openai.",
     )
     openai_model: str = Field(
         default="gpt-4o",
         min_length=1,
-        description="Model used for every pipeline stage; recorded in run metadata.",
+        description="OpenAI model used for every pipeline stage.",
     )
     openai_temperature: float = Field(
         default=0.2,
@@ -59,18 +92,35 @@ class Settings(BaseSettings):
         le=2.0,
         description="Low by default so repeated research runs stay comparable.",
     )
-    openai_max_retries: int = Field(
-        default=3,
-        ge=0,
-        le=10,
-        description="Retry budget for transient API failures, using exponential backoff.",
+
+    # --- Anthropic ----------------------------------------------------------
+    anthropic_api_key: SecretStr | None = Field(
+        default=None,
+        description="Anthropic API key. Required when the provider is anthropic.",
     )
-    openai_timeout_seconds: float = Field(
-        default=60.0,
-        gt=0.0,
-        le=600.0,
-        description="Per-request timeout applied to every LLM call.",
+    anthropic_model: str = Field(
+        default="claude-opus-5",
+        min_length=1,
+        description="Anthropic model used for every pipeline stage.",
     )
+    anthropic_max_tokens: int = Field(
+        default=16_000,
+        ge=1_024,
+        le=128_000,
+        description=(
+            "Output budget per Anthropic call, which the API requires. It covers "
+            "reasoning as well as the response, so leave generous headroom."
+        ),
+    )
+    anthropic_effort: EffortLevel = Field(
+        default="high",
+        description=(
+            "Reasoning depth. Current Claude models reject temperature, so this is "
+            "the equivalent quality/cost dial."
+        ),
+    )
+
+    # --- paths --------------------------------------------------------------
     candidate_profile_path: Path = Field(
         default=Path("data/candidate_profile.yaml"),
         description="Immutable source profile; never written to during generation.",
@@ -79,6 +129,8 @@ class Settings(BaseSettings):
         default=Path("output"),
         description="Root directory for generated experiment artifacts.",
     )
+
+    # --- diagnostics --------------------------------------------------------
     log_level: LogLevel = Field(
         default="INFO",
         description="Standard library logging level name.",
@@ -91,6 +143,67 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return value.strip().upper()
         return value
+
+    @field_validator("anthropic_effort", "llm_provider", mode="before")
+    @classmethod
+    def _normalize_lowercase(cls, value: object) -> object:
+        """Accept ``OpenAI``/``HIGH`` as well as the canonical lower-case values."""
+        if isinstance(value, str):
+            return value.strip().lower()
+        return value
+
+    @model_validator(mode="after")
+    def _check_a_provider_is_usable(self) -> Settings:
+        """Fail at load time rather than at the first API call."""
+        if self.openai_api_key is None and self.anthropic_api_key is None:
+            raise ValueError(
+                "no LLM credentials configured; set OPENAI_API_KEY or ANTHROPIC_API_KEY"
+            )
+        if self.llm_provider is not None and self._key_for(self.llm_provider) is None:
+            raise ValueError(
+                f"LLM_PROVIDER is {self.llm_provider.value!r} "
+                f"but {self.llm_provider.value.upper()}_API_KEY is not set"
+            )
+        return self
+
+    @property
+    def resolved_provider(self) -> LLMProvider:
+        """The provider a run will use.
+
+        An explicit ``LLM_PROVIDER`` always wins. Otherwise the provider is inferred
+        from whichever key is configured, so a researcher with a single key does not
+        have to set it; OpenAI wins when both are present.
+        """
+        if self.llm_provider is not None:
+            return self.llm_provider
+        if self.openai_api_key is not None:
+            return LLMProvider.OPENAI
+        return LLMProvider.ANTHROPIC
+
+    def api_key_for(self, provider: LLMProvider) -> SecretStr:
+        """Return the key for ``provider``.
+
+        Raises:
+            ConfigurationError: If that provider has no key configured.
+        """
+        key = self._key_for(provider)
+        if key is None:
+            raise ConfigurationError(
+                f"Provider {provider.value!r} is selected but "
+                f"{provider.value.upper()}_API_KEY is not set."
+            )
+        return key
+
+    def model_for(self, provider: LLMProvider) -> str:
+        """Return the model identifier configured for ``provider``."""
+        if provider is LLMProvider.OPENAI:
+            return self.openai_model
+        return self.anthropic_model
+
+    def _key_for(self, provider: LLMProvider) -> SecretStr | None:
+        if provider is LLMProvider.OPENAI:
+            return self.openai_api_key
+        return self.anthropic_api_key
 
     @property
     def runs_dir(self) -> Path:
