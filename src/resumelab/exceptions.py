@@ -12,6 +12,10 @@ class ResumeLabError(Exception):
     """Base class for all ResumeLab errors."""
 
 
+class ConfigurationError(ResumeLabError):
+    """Application settings are missing or invalid."""
+
+
 class CandidateProfileError(ResumeLabError):
     """The candidate profile is missing, unreadable, or fails schema validation."""
 

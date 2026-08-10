@@ -8,6 +8,7 @@ profile is always treated as immutable so that transformations remain measurable
 
 from resumelab.exceptions import (
     CandidateProfileError,
+    ConfigurationError,
     JDAnalysisError,
     LLMGenerationError,
     PDFRenderingError,
@@ -19,6 +20,7 @@ __version__ = "0.1.0"
 
 __all__ = [
     "CandidateProfileError",
+    "ConfigurationError",
     "JDAnalysisError",
     "LLMGenerationError",
     "PDFRenderingError",
