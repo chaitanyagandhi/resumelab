@@ -7,7 +7,13 @@ import pytest
 
 from resumelab.llm.client import LLMCallStats, TokenUsage
 from resumelab.models.analysis import JobAnalysis
+from resumelab.models.candidate import CandidateProfile
 from resumelab.models.job import JobDescription, JobDescriptionSource
+from resumelab.models.strategy import (
+    ExperienceDirection,
+    ProjectDirection,
+    TransformationStrategy,
+)
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
@@ -138,6 +144,41 @@ def job_analysis():
             "An engineer who has worked close to the operating system and reasons "
             "about tail latency and failure modes in distributed storage."
         ),
+    )
+
+
+@pytest.fixture
+def candidate_profile(profile_data):
+    """The validated profile corresponding to ``profile_data``."""
+    return CandidateProfile.model_validate(profile_data)
+
+
+@pytest.fixture
+def transformation_strategy():
+    """A strategy covering the fixture profile: one role and three projects."""
+    return TransformationStrategy(
+        target_identity="Early-career storage infrastructure engineer.",
+        summary_direction="Lead with distributed storage systems work in Go on Linux.",
+        experience_directions=(
+            ExperienceDirection(
+                experience="Analytical Engines Inc.",
+                target_framing="Reframe the ingestion work as a storage data path.",
+                concepts_to_emphasize=("write path latency", "replication"),
+                jd_terms_to_incorporate=("NVMe", "Go"),
+            ),
+        ),
+        project_directions=tuple(
+            ProjectDirection(
+                project=f"Project {index}",
+                new_positioning=f"Positioning {index} toward distributed storage.",
+                possible_title_direction=f"Project {index} — Storage Engine",
+                concepts_to_incorporate=("erasure coding", "tail latency"),
+            )
+            for index in range(1, 4)
+        ),
+        skills_priority=("Go", "Linux", "Distributed Systems"),
+        tone="Direct and systems-oriented.",
+        overall_strategy="Present the candidate as a storage systems engineer.",
     )
 
 

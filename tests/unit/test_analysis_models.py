@@ -4,7 +4,8 @@ import pytest
 from openai.lib._pydantic import to_strict_json_schema
 from pydantic import ValidationError
 
-from resumelab.models.analysis import MAX_LIST_ITEMS, JobAnalysis
+from resumelab.models.analysis import JobAnalysis
+from resumelab.models.common import MAX_LIST_ITEMS
 
 TEXT_FIELDS = ("role_title", "role_archetype", "technical_identity", "ideal_candidate_profile")
 LIST_FIELDS = (

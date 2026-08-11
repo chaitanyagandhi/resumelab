@@ -189,6 +189,50 @@ domain-experienced reader would infer, and keep it specific enough to act on.\
 """Reads a job description into :class:`~resumelab.models.analysis.JobAnalysis`."""
 
 
+STRATEGY_PROMPT: Final = Prompt(
+    name="transformation_strategy",
+    version=TRANSFORMATION_PROMPT_VERSION,
+    instructions="""\
+Plan how to reposition this candidate for this role. Produce the plan only. Do not \
+write any resume content yet; later stages execute what you decide here.
+
+The plan exists so the finished resume reads as one person with one coherent \
+technical identity. Sections tailored independently produce a resume that contradicts \
+itself: a summary claiming distributed systems depth over projects framed as web apps. \
+Decide the through-line now, and make every direction serve it.
+
+Work from the job analysis, especially its technical_identity. That is the engineer \
+this employer is looking for. Your job is to decide how this specific candidate's real \
+history gets presented as that engineer.
+
+- target_identity: the identity the finished resume should project. Grounded in the \
+job analysis, but expressed as a claim about this candidate.
+- summary_direction: what the professional summary must establish in one or two lines.
+- experience_directions: one entry per role in the profile. Echo the company exactly \
+as it appears there. target_framing says what that role should look like it was about. \
+concepts_to_emphasize and jd_terms_to_incorporate say which ideas and vocabulary \
+belong there specifically, not everywhere.
+- project_directions: one entry per project in the profile. Echo the project name \
+exactly. new_positioning says what the project should now appear to be. \
+possible_title_direction proposes a subtitle aimed at this role. \
+concepts_to_incorporate lists the technical ideas to build the rewrite around.
+- skills_priority: the skills that should lead, ordered by how much they matter to \
+this employer.
+- tone: the register the writing should hold throughout.
+- overall_strategy: the reasoning connecting these choices, in a few sentences.
+
+Distribute the job description's vocabulary deliberately. Every bullet reaching for \
+every keyword reads as keyword stuffing and is the failure mode to avoid; assign each \
+concept where it is most credible. Give each experience and each project a distinct \
+job to do in the overall picture, so they complement rather than repeat each other.
+
+Reposition boldly. Changing what a project appears to be about, and the technologies \
+it appears to be built on, is expected.\
+""",
+)
+"""Plans the repositioning that later stages execute."""
+
+
 def neutralize_fences(content: str) -> str:
     """Strip anything in ``content`` that could be mistaken for a fence marker.
 
