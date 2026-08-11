@@ -29,6 +29,9 @@ def build_metadata(
     model: str,
     job_description: JobDescription,
     stats: LLMCallStats,
+    layout_scale: float | None = None,
+    page_count: int | None = None,
+    condensed: bool = False,
 ) -> RunMetadata:
     """Describe how this run was produced.
 
@@ -40,6 +43,9 @@ def build_metadata(
         model: The model actually used.
         job_description: The posting this run targeted.
         stats: Call and token accounting from the client.
+        layout_scale: Layout tightening applied to fit one page, if any.
+        page_count: Pages the rendered resume occupies.
+        condensed: Whether the content had to be shortened before it fit.
 
     Returns:
         The :class:`RunMetadata` to write into the run directory.
@@ -61,6 +67,9 @@ def build_metadata(
         candidate_profile_hash=sha256_of_file(settings.candidate_profile_path),
         job_description_source=job_description.source.value,
         job_description_characters=job_description.character_count,
+        layout_scale=layout_scale,
+        page_count=page_count,
+        condensed=condensed,
         duration_seconds=round(run.elapsed_seconds(), 3),
         llm_calls=stats.call_count,
         token_usage=TokenUsageRecord(

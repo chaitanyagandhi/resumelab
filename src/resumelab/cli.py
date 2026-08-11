@@ -12,6 +12,7 @@ for when the traceback is the thing you want.
 
 from __future__ import annotations
 
+import sys
 import textwrap
 from collections.abc import Iterator
 from contextlib import contextmanager
@@ -27,7 +28,12 @@ from resumelab.llm.factory import create_llm_client
 from resumelab.loaders import load_job_description
 from resumelab.logging_setup import configure_logging
 from resumelab.models.analysis import JobAnalysis
-from resumelab.pipeline import analyze_job_description
+from resumelab.pipeline import (
+    GenerationResult,
+    analyze_job_description,
+    copy_pdf,
+    generate_resume,
+)
 
 app = typer.Typer(
     name="resumelab",
@@ -58,6 +64,10 @@ OutputOption = Annotated[
 DebugOption = Annotated[
     bool,
     typer.Option("--debug", help="Log at DEBUG and show tracebacks on failure."),
+]
+PdfOutputOption = Annotated[
+    Path | None,
+    typer.Option("--output", "-o", help="Also write the resume PDF here."),
 ]
 
 
@@ -175,3 +185,91 @@ def _heading(text: str) -> str:
 def _wrapped(text: str, *, width: int = 78) -> str:
     """Indent and wrap a block so long fields stay readable in a terminal."""
     return textwrap.fill(text, width=width, initial_indent="  ", subsequent_indent="  ")
+
+
+@app.command()
+def generate(
+    jd: JdOption = None,
+    jd_text: JdTextOption = None,
+    provider: ProviderOption = None,
+    output: PdfOutputOption = None,
+    debug: DebugOption = False,
+) -> None:
+    """Generate a resume tailored to a job description.
+
+    Every run writes a self-contained directory under the configured output path,
+    holding the posting, the analysis, the strategy, the generated resume, the
+    metadata, and the PDF.
+
+    The generated resume may present technologies, metrics, and project framings
+    that are not in the source profile. That transformation is what this tool exists
+    to study; the source profile is never modified.
+    """
+    settings = _load_settings(debug)
+    configure_logging(settings.log_level, debug=debug)
+
+    with _reported_failures(debug):
+        job_description = load_job_description(path=jd, text=jd_text)
+        chosen = _choose_provider(settings, provider)
+        client = create_llm_client(settings, provider=chosen)
+        result = generate_resume(
+            job_description,
+            settings=settings,
+            provider=chosen or settings.resolved_provider,
+            client=client,
+        )
+        if output is not None:
+            copy_pdf(result.render, output)
+
+    typer.echo(_format_result(result, output))
+
+
+def _choose_provider(settings: Settings, provider: LLMProvider | None) -> LLMProvider | None:
+    """Decide which provider to use, asking when the choice is genuinely open.
+
+    The flag wins. Otherwise the question is only worth asking when both providers
+    are usable and someone is there to answer: in a script or a batch run the
+    configured provider is used without a prompt.
+    """
+    if provider is not None:
+        return provider
+    if not (settings.openai_api_key and settings.anthropic_api_key):
+        return None
+    if not _is_interactive():
+        return None
+
+    options = [member.value for member in LLMProvider]
+    answer = typer.prompt(
+        f"Which provider should generate this resume? ({'/'.join(options)})",
+        default=settings.resolved_provider.value,
+    )
+    while answer not in options:
+        typer.secho(f"Choose one of: {', '.join(options)}", fg=typer.colors.YELLOW, err=True)
+        answer = typer.prompt("Provider", default=settings.resolved_provider.value)
+    return LLMProvider(answer)
+
+
+def _is_interactive() -> bool:
+    """Whether someone is at the keyboard to answer a question."""
+    return sys.stdin.isatty()
+
+
+def _format_result(result: GenerationResult, output: Path | None) -> str:
+    """Summarize the run, leading with the file the researcher wants to open."""
+    metadata = result.metadata
+    lines = [
+        _heading("GENERATED"),
+        f"  resume:    {output or result.render.path}",
+        f"  run:       {result.run.directory}",
+        "",
+        _heading("RUN"),
+        f"  provider:  {metadata.provider} ({metadata.model})",
+        f"  identity:  {result.resume.summary[:70]}...",
+        f"  calls:     {metadata.llm_calls}"
+        f"  tokens: {metadata.token_usage.total_tokens}"
+        f"  duration: {metadata.duration_seconds:.1f}s",
+        f"  layout:    {result.render.page_count} page(s)"
+        f" at scale {result.render.scale:g}"
+        f"{', condensed to fit' if result.condensed else ''}",
+    ]
+    return "\n".join(lines)

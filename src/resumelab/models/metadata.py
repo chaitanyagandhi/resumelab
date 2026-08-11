@@ -57,6 +57,14 @@ class RunMetadata(BaseModel):
     job_description_source: str
     job_description_characters: int
 
+    # --- how it turned out --------------------------------------------------
+    layout_scale: float | None = None
+    """Layout tightening applied to fit one page; 1.0 means none was needed."""
+
+    page_count: int | None = None
+    condensed: bool = False
+    """Whether the content had to be shortened before it fit."""
+
     # --- what it cost -------------------------------------------------------
     duration_seconds: float
     llm_calls: int
