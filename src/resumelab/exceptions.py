@@ -16,6 +16,10 @@ class ConfigurationError(ResumeLabError):
     """Application settings are missing or invalid."""
 
 
+class UnsafePathError(ResumeLabError):
+    """A path would write outside where it belongs, or cannot be written at all."""
+
+
 class CandidateProfileError(ResumeLabError):
     """The candidate profile is missing, unreadable, or fails schema validation."""
 

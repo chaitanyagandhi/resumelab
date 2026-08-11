@@ -24,6 +24,7 @@ from resumelab.models.job import JobDescription
 from resumelab.models.metadata import RunMetadata
 from resumelab.models.resume import GeneratedResume
 from resumelab.models.strategy import TransformationStrategy
+from resumelab.utils.paths import ensure_within
 from resumelab.utils.text import slugify
 
 logger = logging.getLogger(__name__)
@@ -109,6 +110,9 @@ def create_run(
     base = f"{stamp}_{slugify(label)}"
 
     directory = _make_unique_directory(runs_dir, base)
+    # Defence in depth: the label is slugified above, so this cannot currently fail.
+    # It is asserted anyway, because the label comes from outside the program.
+    ensure_within(directory, runs_dir, subject="The run directory")
     logger.info("recording run id=%s directory=%s", directory.name, directory)
     return ExperimentRun(directory=directory, run_id=directory.name, started_at=started_at)
 

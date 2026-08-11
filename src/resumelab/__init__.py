@@ -14,6 +14,7 @@ from resumelab.exceptions import (
     PDFRenderingError,
     ResumeLabError,
     ResumeValidationError,
+    UnsafePathError,
 )
 
 __version__ = "0.1.0"
@@ -26,5 +27,6 @@ __all__ = [
     "PDFRenderingError",
     "ResumeLabError",
     "ResumeValidationError",
+    "UnsafePathError",
     "__version__",
 ]

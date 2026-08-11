@@ -12,6 +12,14 @@ import unicodedata
 
 _PRESERVED_CONTROL_CHARACTERS = frozenset("\n\t")
 
+_HIDDEN_CATEGORIES = frozenset({"Cc", "Cf"})
+"""Control and format characters.
+
+``Cf`` matters as much as ``Cc`` here: zero-width joiners and bidirectional
+overrides are invisible, survive copy-paste, and can make text render in an order
+that differs from the order it will be read in.
+"""
+
 
 MAX_SLUG_LENGTH = 40
 """Keeps run directory names readable and well inside filesystem limits."""
@@ -48,14 +56,15 @@ def control_characters(value: str) -> list[str]:
 def normalize_text(value: str) -> str:
     """Return ``value`` as clean, consistently encoded text.
 
-    Line endings are unified to ``\\n``, control characters other than newline and
-    tab are dropped, the result is NFC-normalized so visually identical strings hash
-    identically, and surrounding whitespace is removed.
+    Line endings are unified to ``\\n``, invisible control and format characters
+    other than newline and tab are dropped, the result is NFC-normalized so visually
+    identical strings hash identically, and surrounding whitespace is removed.
     """
     unified_newlines = value.replace("\r\n", "\n").replace("\r", "\n")
     without_controls = "".join(
         character
         for character in unified_newlines
-        if character in _PRESERVED_CONTROL_CHARACTERS or unicodedata.category(character) != "Cc"
+        if character in _PRESERVED_CONTROL_CHARACTERS
+        or unicodedata.category(character) not in _HIDDEN_CATEGORIES
     )
     return unicodedata.normalize("NFC", without_controls).strip()

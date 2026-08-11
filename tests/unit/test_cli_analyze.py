@@ -12,7 +12,7 @@ from typer.testing import CliRunner
 from resumelab import __version__
 from resumelab.cli import app
 from resumelab.config import LLMProvider
-from resumelab.exceptions import JDAnalysisError
+from resumelab.exceptions import JDAnalysisError, UnsafePathError
 from resumelab.models.analysis import JobAnalysis
 
 OPENAI_KEY = "sk-test-not-a-real-key"
@@ -137,7 +137,8 @@ def test_an_unwritable_output_path_is_reported_readably(tmp_path, jd_file, fake_
         result = invoke("analyze", "--jd", str(jd_file), "-o", str(blocked / "x" / "a.json"))
 
         assert result.exit_code == 1
-        assert "Could not write the analysis" in result.stderr
+        assert "analysis output path" in result.stderr
+        assert "Traceback" not in result.stderr
     finally:
         blocked.chmod(0o700)
 
@@ -311,6 +312,74 @@ def test_debug_re_raises_a_write_failure_too(tmp_path, jd_file, fake_llm):
             "analyze", "--jd", str(jd_file), "-o", str(blocked / "x" / "a.json"), "--debug"
         )
 
-        assert isinstance(result.exception, OSError)
+        assert isinstance(result.exception, UnsafePathError)
     finally:
         blocked.chmod(0o700)
+
+
+def test_an_output_path_that_names_a_directory_is_rejected(tmp_path, jd_file, fake_llm):
+    """Writing over a directory is a mistake worth catching before the API call."""
+    result = invoke("analyze", "--jd", str(jd_file), "-o", str(tmp_path))
+
+    assert result.exit_code == 1
+    assert "is a directory, not a file" in result.stderr
+
+
+# --- unexpected failures --------------------------------------------------
+
+
+def test_an_unexpected_error_is_not_a_wall_of_traceback(monkeypatch, jd_file):
+    """A bug should still leave the user one readable line and a way to get more."""
+
+    def explode(*_args, **_kwargs):
+        raise ValueError("something the code did not anticipate")
+
+    monkeypatch.setattr("resumelab.cli.create_llm_client", explode)
+
+    result = invoke("analyze", "--jd", str(jd_file))
+
+    assert result.exit_code == 1
+    assert "ResumeLab failed unexpectedly: ValueError" in result.stderr
+    assert "--debug" in result.stderr
+    assert "Traceback" not in result.stderr
+
+
+def test_debug_re_raises_an_unexpected_error(monkeypatch, jd_file):
+    def explode(*_args, **_kwargs):
+        raise ValueError("something the code did not anticipate")
+
+    monkeypatch.setattr("resumelab.cli.create_llm_client", explode)
+
+    result = invoke("analyze", "--jd", str(jd_file), "--debug")
+
+    assert isinstance(result.exception, ValueError)
+
+
+def test_an_interrupt_exits_cleanly(monkeypatch, jd_file):
+    """Ctrl-C is a decision, not a crash."""
+
+    def interrupt(*_args, **_kwargs):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("resumelab.cli.create_llm_client", interrupt)
+
+    result = invoke("analyze", "--jd", str(jd_file))
+
+    assert result.exit_code == 130
+    assert "Interrupted." in result.stderr
+
+
+def test_a_write_that_fails_after_validation_is_still_reported(
+    monkeypatch, tmp_path, jd_file, fake_llm
+):
+    """The directory was writable when checked; the write can still fail."""
+
+    def refuse(*_args, **_kwargs):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr("pathlib.Path.write_text", refuse)
+
+    result = invoke("analyze", "--jd", str(jd_file), "-o", str(tmp_path / "out.json"))
+
+    assert result.exit_code == 1
+    assert "Could not write the analysis" in result.stderr

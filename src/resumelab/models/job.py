@@ -12,7 +12,7 @@ from enum import StrEnum
 from pathlib import Path
 from typing import Annotated
 
-from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
 
 from resumelab.utils.text import normalize_text
 
@@ -23,18 +23,27 @@ MAX_JOB_DESCRIPTION_CHARACTERS = 50_000
 """Roughly 12k tokens. Guards against an entire careers page being piped in."""
 
 
-def _normalize(value: object) -> object:
-    return normalize_text(value) if isinstance(value, str) else value
+def _normalize_and_bound(value: str) -> str:
+    """Normalize the posting, then hold it to a usable length.
+
+    Length is judged after normalization, so a posting made only of invisible
+    characters is reported as empty rather than as mysteriously too short.
+    """
+    normalized = normalize_text(value)
+    if not normalized:
+        raise ValueError("must not be empty")
+    if len(normalized) < MIN_JOB_DESCRIPTION_CHARACTERS:
+        raise ValueError(
+            f"must be at least {MIN_JOB_DESCRIPTION_CHARACTERS} characters, got {len(normalized)}"
+        )
+    if len(normalized) > MAX_JOB_DESCRIPTION_CHARACTERS:
+        raise ValueError(
+            f"must be at most {MAX_JOB_DESCRIPTION_CHARACTERS} characters, got {len(normalized)}"
+        )
+    return normalized
 
 
-JobDescriptionText = Annotated[
-    str,
-    BeforeValidator(_normalize),
-    Field(
-        min_length=MIN_JOB_DESCRIPTION_CHARACTERS,
-        max_length=MAX_JOB_DESCRIPTION_CHARACTERS,
-    ),
-]
+JobDescriptionText = Annotated[str, AfterValidator(_normalize_and_bound)]
 
 
 class JobDescriptionSource(StrEnum):

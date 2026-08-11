@@ -23,7 +23,7 @@ import typer
 
 from resumelab import __version__
 from resumelab.config import LLMProvider, Settings, load_settings
-from resumelab.exceptions import ResumeLabError
+from resumelab.exceptions import ResumeLabError, UnsafePathError
 from resumelab.llm.factory import create_llm_client
 from resumelab.loaders import load_job_description
 from resumelab.logging_setup import configure_logging
@@ -34,6 +34,7 @@ from resumelab.pipeline import (
     copy_pdf,
     generate_resume,
 )
+from resumelab.utils.paths import prepare_output_file
 
 app = typer.Typer(
     name="resumelab",
@@ -119,7 +120,12 @@ def _load_settings(debug: bool) -> Settings:
 
 @contextmanager
 def _reported_failures(debug: bool) -> Iterator[None]:
-    """Turn an expected failure into a message and a non-zero exit."""
+    """Turn a failure into a message and a non-zero exit.
+
+    Expected failures are reported as themselves. Anything else is a bug, and gets a
+    short line naming it plus a pointer at --debug — a wall of traceback tells an
+    ordinary user nothing and buries the one line that does.
+    """
     try:
         yield
     except ResumeLabError as exc:
@@ -127,18 +133,29 @@ def _reported_failures(debug: bool) -> Iterator[None]:
             raise
         typer.secho(str(exc), fg=typer.colors.RED, err=True)
         raise typer.Exit(code=1) from exc
+    except KeyboardInterrupt:
+        typer.secho("Interrupted.", fg=typer.colors.YELLOW, err=True)
+        raise typer.Exit(code=130) from None
+    except Exception as exc:
+        if debug:
+            raise
+        typer.secho(
+            f"ResumeLab failed unexpectedly: {type(exc).__name__}: {exc}\n"
+            "Re-run with --debug for the full traceback.",
+            fg=typer.colors.RED,
+            err=True,
+        )
+        raise typer.Exit(code=1) from exc
 
 
 def _write_json(path: Path, analysis: JobAnalysis, *, debug: bool) -> None:
     """Write the analysis where a later comparison can read it."""
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        path.write_text(analysis.model_dump_json(indent=2) + "\n", encoding="utf-8")
-    except OSError as exc:
-        if debug:
-            raise
-        typer.secho(f"Could not write the analysis to {path}: {exc}", fg=typer.colors.RED, err=True)
-        raise typer.Exit(code=1) from exc
+    with _reported_failures(debug):
+        target = prepare_output_file(path, subject="The analysis output path")
+        try:
+            target.write_text(analysis.model_dump_json(indent=2) + "\n", encoding="utf-8")
+        except OSError as exc:
+            raise UnsafePathError(f"Could not write the analysis to {target}: {exc}") from exc
 
 
 def _format_analysis(analysis: JobAnalysis) -> str:
@@ -219,7 +236,7 @@ def generate(
             client=client,
         )
         if output is not None:
-            copy_pdf(result.render, output)
+            copy_pdf(result.render, prepare_output_file(output, subject="The resume output path"))
 
     typer.echo(_format_result(result, output))
 

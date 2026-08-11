@@ -12,9 +12,11 @@ from pathlib import Path
 from pydantic import ValidationError
 
 from resumelab.exceptions import JDAnalysisError
+from resumelab.llm.prompts import injection_markers
 from resumelab.models.job import JobDescription, JobDescriptionSource
 from resumelab.utils.errors import describe_validation_error
 from resumelab.utils.files import read_text_file
+from resumelab.utils.text import normalize_text
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +53,7 @@ def load_job_description(
     else:
         raise JDAnalysisError("A job description is required: pass --jd PATH or --jd-text TEXT.")
 
-    if not raw.strip():
+    if not normalize_text(raw):
         raise JDAnalysisError(f"Job description is empty: {_describe_origin(source, path)}")
 
     try:
@@ -68,7 +70,23 @@ def load_job_description(
         source.value,
         job_description.character_count,
     )
+    _warn_about_instruction_like_content(job_description)
     return job_description
+
+
+def _warn_about_instruction_like_content(job_description: JobDescription) -> None:
+    """Note when a posting appears to address the model.
+
+    The content is still analyzed, fenced as data. This only makes such a run
+    identifiable afterwards, which matters when the output looks unusual.
+    """
+    markers = injection_markers(job_description.text)
+    if markers:
+        logger.warning(
+            "job description contains instruction-like text; it will be analyzed as "
+            "data, never obeyed: %s",
+            "; ".join(repr(marker) for marker in markers),
+        )
 
 
 def _describe_origin(source: JobDescriptionSource, path: Path | None) -> str:

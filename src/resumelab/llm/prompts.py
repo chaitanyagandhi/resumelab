@@ -422,6 +422,42 @@ still stand on its own as a complete accomplishment.\
 """Shortens a resume that does not fit, instead of truncating it."""
 
 
+INSTRUCTION_PATTERNS: Final[tuple[re.Pattern[str], ...]] = tuple(
+    re.compile(pattern, re.IGNORECASE)
+    for pattern in (
+        r"\bignore (?:all |any )?(?:previous|prior|above|preceding) (?:instructions|prompts)",
+        r"\bdisregard (?:all |any |the )?(?:previous|prior|above|preceding)\b",
+        r"\byou are now\b",
+        r"\bnew instructions?\b",
+        r"\b(?:system|developer)\s*(?:prompt|message|instruction)\b",
+        # "act as the primary owner" is ordinary posting language; what follows
+        # has to be model-shaped for this to mean anything.
+        r"\bact as (?:an? )?(?:un(?:filtered|restricted|censored)|jailbroken"
+        r"|ai\b|assistant|chatbot|language model)",
+        r"\breveal (?:your|the) (?:prompt|instructions|system)",
+        r"\boverride (?:your|the|all)\b",
+    )
+)
+"""Phrases that suggest a posting is addressing the model rather than a reader.
+
+Detection is a research signal, not a defence. The defence is the fencing and the
+system prompt; this exists so a run whose posting tried something is visible in the
+log rather than only in the output.
+"""
+
+
+def injection_markers(content: str) -> list[str]:
+    """Return the instruction-like phrases found in ``content``.
+
+    Matches are reported, never removed: the text is evidence about the posting, and
+    a keyword filter that edited it would be both easy to evade and lossy.
+    """
+    found = [
+        match.group(0) for pattern in INSTRUCTION_PATTERNS for match in pattern.finditer(content)
+    ]
+    return sorted(dict.fromkeys(found))
+
+
 def neutralize_fences(content: str) -> str:
     """Strip anything in ``content`` that could be mistaken for a fence marker.
 
