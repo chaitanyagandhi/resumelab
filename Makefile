@@ -3,7 +3,14 @@ PY := $(VENV)/bin/python
 UV := $(shell command -v uv 2>/dev/null)
 
 .DEFAULT_GOAL := help
-.PHONY: help install format lint typecheck test check clean
+.PHONY: help install format lint typecheck test check clean analyze generate
+
+define require_jd
+	if [ -z "$(JD)" ]; then \
+		echo "Set JD to a job description file, e.g. make $@ JD=examples/sample_jd.txt"; \
+		exit 1; \
+	fi
+endef
 
 help: ## Show available targets
 	@grep -E '^[a-zA-Z_-]+:.*?## ' $(MAKEFILE_LIST) \
@@ -34,6 +41,14 @@ test: ## Run the test suite with coverage
 	$(PY) -m pytest
 
 check: lint typecheck test ## Run all quality gates
+
+analyze: ## Analyze a job description (JD=examples/sample_jd.txt)
+	@$(call require_jd)
+	$(VENV)/bin/resumelab analyze --jd $(JD)
+
+generate: ## Generate a resume for a job description (JD=examples/sample_jd.txt)
+	@$(call require_jd)
+	$(VENV)/bin/resumelab generate --jd $(JD)
 
 clean: ## Remove caches and build artifacts
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage htmlcov dist build
