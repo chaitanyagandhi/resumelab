@@ -386,6 +386,42 @@ Omit proficiency ratings, years of experience, and soft skills. List the skill.\
 """Builds the skills section around the target identity."""
 
 
+CONDENSE_PROMPT: Final = Prompt(
+    name="condense",
+    version=TRANSFORMATION_PROMPT_VERSION,
+    instructions="""\
+Shorten this resume so it fits on one page. Return a replacement for the summary and \
+a replacement for every bullet, in the order given.
+
+You are editing, not rewriting. The claims stay: the same work, the same \
+technologies, the same numbers, the same positioning. What goes is the words that \
+were not carrying any of it.
+
+Where the length actually is:
+- Qualifiers and hedges that add nothing. "Successfully", "effectively", "helped to", \
+"was able to", "in order to", "responsible for leading".
+- Restated context. If a bullet's opening clause explains what the project was, the \
+reader already knows from the subtitle above it.
+- Long constructions with short equivalents. "Implemented a solution that reduced" is \
+"Cut".
+- Repetition across bullets. If two bullets both establish the same thing, one of \
+them can stop.
+
+What does not go:
+- Any technology, protocol, or system name.
+- Any number, and any unit attached to it.
+- The action verb opening each bullet, which must stay distinct across the resume.
+- Anything that would make a bullet vague. A short bullet that says nothing is worse \
+than a long one that says something; shorten by removing filler, never by removing \
+specificity.
+
+Return exactly as many bullets as you were given, in the same order. Each one must \
+still stand on its own as a complete accomplishment.\
+""",
+)
+"""Shortens a resume that does not fit, instead of truncating it."""
+
+
 def neutralize_fences(content: str) -> str:
     """Strip anything in ``content`` that could be mistaken for a fence marker.
 

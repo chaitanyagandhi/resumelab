@@ -6,7 +6,11 @@ import pytest
 
 from resumelab.exceptions import ResumeLabError, ResumeValidationError
 from resumelab.models.candidate import PersonalDetails
-from resumelab.models.resume import MAX_BULLET_CHARACTERS, MIN_BULLET_CHARACTERS
+from resumelab.models.resume import (
+    MAX_BULLET_CHARACTERS,
+    MIN_BULLET_CHARACTERS,
+    ResumeLimits,
+)
 from resumelab.validation import validate_resume
 
 
@@ -226,3 +230,55 @@ def test_the_message_names_the_offending_entry(generated_resume):
 
 def test_all_bullets_collects_the_whole_document(generated_resume):
     assert len(generated_resume.all_bullets) == 3 + 3 * 3
+
+
+# --- the configurable length budget ---------------------------------------
+
+
+def test_the_default_budget_matches_what_generation_already_enforces(generated_resume):
+    """Out of the box, nothing the stages produced can fail this check."""
+    validate_resume(generated_resume, ResumeLimits())
+
+
+def test_a_tighter_summary_budget_is_enforced(generated_resume):
+    limits = ResumeLimits(summary_max_characters=40)
+
+    with pytest.raises(ResumeValidationError, match="over the 40 allowed"):
+        validate_resume(generated_resume, limits)
+
+
+def test_a_tighter_bullet_budget_is_enforced(generated_resume):
+    limits = ResumeLimits(bullet_max_characters=60)
+
+    with pytest.raises(ResumeValidationError, match="expected between 40 and 60"):
+        validate_resume(generated_resume, limits)
+
+
+def test_a_configured_experience_bullet_count_is_enforced(generated_resume):
+    """Configuration that cannot be honoured fails loudly rather than being ignored."""
+    limits = ResumeLimits(experience_bullet_count=4)
+
+    with pytest.raises(ResumeValidationError, match="expected exactly 4"):
+        validate_resume(generated_resume, limits)
+
+
+def test_a_configured_project_bullet_count_is_enforced(generated_resume):
+    limits = ResumeLimits(project_bullet_count=2)
+
+    with pytest.raises(ResumeValidationError, match="expected exactly 2"):
+        validate_resume(generated_resume, limits)
+
+
+def test_settings_supply_the_budget():
+    from resumelab.config import Settings
+
+    settings = Settings(
+        _env_file=None,
+        openai_api_key="sk-test-not-a-real-key",
+        summary_max_characters=200,
+        bullet_max_characters=150,
+    )
+
+    assert settings.resume_limits == ResumeLimits(
+        summary_max_characters=200, bullet_max_characters=150
+    )

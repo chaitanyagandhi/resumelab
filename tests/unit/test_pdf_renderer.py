@@ -12,13 +12,18 @@ from pypdf import PdfReader
 
 from resumelab.exceptions import PDFRenderingError, ResumeLabError
 from resumelab.rendering import render_resume
-from resumelab.rendering.styles import PAGE_SIZE, build_stylesheet
+from resumelab.rendering.styles import (
+    LAYOUT_SCALES,
+    MIN_BODY_FONT_SIZE,
+    PAGE_SIZE,
+    build_stylesheet,
+)
 from resumelab.utils.text import control_characters
 
 
 @pytest.fixture
 def rendered(tmp_path, generated_resume):
-    return render_resume(generated_resume, tmp_path / "resume.pdf")
+    return render_resume(generated_resume, tmp_path / "resume.pdf").path
 
 
 @pytest.fixture
@@ -47,13 +52,13 @@ def test_the_file_carries_the_pdf_signature(rendered):
 def test_the_path_is_returned(tmp_path, generated_resume):
     target = tmp_path / "out" / "resume.pdf"
 
-    assert render_resume(generated_resume, target) == target
+    assert render_resume(generated_resume, target).path == target
 
 
 def test_missing_parent_directories_are_created(tmp_path, generated_resume):
     target = tmp_path / "deeply" / "nested" / "resume.pdf"
 
-    assert render_resume(generated_resume, target).exists()
+    assert render_resume(generated_resume, target).path.exists()
 
 
 def test_the_page_is_us_letter(reader):
@@ -67,6 +72,107 @@ def test_the_page_is_us_letter(reader):
 
 def test_a_normal_resume_fits_one_page(reader):
     assert len(reader.pages) == 1
+
+
+# --- fitting one page -----------------------------------------------------
+
+
+def test_content_that_already_fits_is_not_tightened(tmp_path, generated_resume):
+    result = render_resume(generated_resume, tmp_path / "roomy.pdf")
+
+    assert result.scale == 1.0
+    assert result.was_tightened is False
+    assert result.fits_on_one_page
+
+
+def test_slightly_overflowing_content_is_tightened_onto_one_page(tmp_path, generated_resume):
+    """The conservative auto-fit: shrink type and spacing together, within limits."""
+    crowded = _with_extra_roles(generated_resume, count=4)
+
+    result = render_resume(crowded, tmp_path / "crowded.pdf")
+
+    assert result.fits_on_one_page
+    assert result.was_tightened
+    assert result.scale in LAYOUT_SCALES
+
+
+def test_the_written_file_matches_the_chosen_layout(tmp_path, generated_resume):
+    """Only the accepted attempt is written; the file is never a discarded draft."""
+    crowded = _with_extra_roles(generated_resume, count=4)
+
+    result = render_resume(crowded, tmp_path / "crowded.pdf")
+
+    assert len(PdfReader(result.path).pages) == result.page_count
+
+
+def test_content_is_never_shrunk_below_the_readability_floor(tmp_path, generated_resume):
+    """A readable two-page resume beats an unreadable one-page resume."""
+    far_too_much = _with_extra_roles(generated_resume, count=30)
+
+    result = render_resume(far_too_much, tmp_path / "overflowing.pdf")
+
+    assert result.scale == LAYOUT_SCALES[-1]
+    assert build_stylesheet(result.scale)["body"].fontSize >= MIN_BODY_FONT_SIZE
+
+
+def test_overflow_is_reported_rather_than_hidden(tmp_path, generated_resume):
+    far_too_much = _with_extra_roles(generated_resume, count=30)
+
+    result = render_resume(far_too_much, tmp_path / "overflowing.pdf")
+
+    assert result.fits_on_one_page is False
+    assert result.page_count > 1
+
+
+def test_overflow_is_logged_with_what_to_do_about_it(tmp_path, generated_resume, caplog):
+    far_too_much = _with_extra_roles(generated_resume, count=30)
+
+    with caplog.at_level(logging.WARNING, logger="resumelab.rendering.pdf_renderer"):
+        render_resume(far_too_much, tmp_path / "overflowing.pdf")
+
+    assert "does not fit one page" in caplog.text
+    assert "condense" in caplog.text
+
+
+def test_tightening_is_logged(tmp_path, generated_resume, caplog):
+    crowded = _with_extra_roles(generated_resume, count=4)
+
+    with caplog.at_level(logging.INFO, logger="resumelab.rendering.pdf_renderer"):
+        render_resume(crowded, tmp_path / "crowded.pdf")
+
+    assert "tightened layout" in caplog.text
+
+
+def test_every_layout_scale_keeps_the_body_readable():
+    for scale in LAYOUT_SCALES:
+        assert build_stylesheet(scale)["body"].fontSize >= MIN_BODY_FONT_SIZE
+
+
+def test_tighter_scales_shrink_type_and_spacing_together():
+    roomy, tight = build_stylesheet(LAYOUT_SCALES[0]), build_stylesheet(LAYOUT_SCALES[-1])
+
+    assert tight["body"].fontSize < roomy["body"].fontSize
+    assert tight["section"].spaceBefore < roomy["section"].spaceBefore
+    assert tight["bullet"].leftIndent < roomy["bullet"].leftIndent
+
+
+def test_a_tightened_resume_still_extracts_completely(tmp_path, generated_resume):
+    """Fitting must not cost content: shrinking is a layout change, not an edit."""
+    crowded = _with_extra_roles(generated_resume, count=4)
+
+    text = _text_of(render_resume(crowded, tmp_path / "crowded.pdf").path)
+
+    for bullet in crowded.all_bullets:
+        assert bullet in text
+
+
+def _with_extra_roles(resume, *, count):
+    """Repeat the experience section to push the page past one."""
+    original = resume.experiences[0]
+    roles = tuple(
+        original.model_copy(update={"company": f"Company {index}"}) for index in range(count)
+    )
+    return resume.model_copy(update={"experiences": roles})
 
 
 # --- the text is real text ------------------------------------------------
@@ -132,7 +238,7 @@ def test_achievements_are_rendered_when_present(extracted, generated_resume):
 def test_the_achievements_section_is_omitted_when_there_are_none(tmp_path, generated_resume):
     bare = generated_resume.model_copy(update={"achievements": ()})
 
-    text = _text_of(render_resume(bare, tmp_path / "bare.pdf"))
+    text = _text_of(render_resume(bare, tmp_path / "bare.pdf").path)
 
     assert "ACHIEVEMENTS" not in text
 
@@ -182,7 +288,7 @@ def test_a_profile_url_that_already_has_a_scheme_is_not_doubled(tmp_path, genera
 
     rendered = render_resume(
         generated_resume.model_copy(update={"personal": personal}), tmp_path / "scheme.pdf"
-    )
+    ).path
 
     links = [a.get_object()["/A"]["/URI"] for a in PdfReader(rendered).pages[0]["/Annots"]]
     assert "https://github.com/ada" in links
@@ -201,14 +307,14 @@ def test_markup_characters_are_escaped_not_interpreted(tmp_path, generated_resum
     summary = f"{hazard} across distributed storage clusters running Go on Linux."
     resume = generated_resume.model_copy(update={"summary": summary})
 
-    assert hazard in _text_of(render_resume(resume, tmp_path / "escaped.pdf"))
+    assert hazard in _text_of(render_resume(resume, tmp_path / "escaped.pdf").path)
 
 
 def test_accented_names_render(tmp_path, generated_resume):
     personal = generated_resume.personal.model_copy(update={"name": "José Ramírez"})
     resume = generated_resume.model_copy(update={"personal": personal})
 
-    assert "José Ramírez" in _text_of(render_resume(resume, tmp_path / "accents.pdf"))
+    assert "José Ramírez" in _text_of(render_resume(resume, tmp_path / "accents.pdf").path)
 
 
 def test_a_resume_without_optional_contact_fields_renders(tmp_path, generated_resume):
@@ -217,7 +323,7 @@ def test_a_resume_without_optional_contact_fields_renders(tmp_path, generated_re
     minimal = PersonalDetails(name="Ada Lovelace", email="ada@example.edu")
     resume = generated_resume.model_copy(update={"personal": minimal})
 
-    assert "Ada Lovelace" in _text_of(render_resume(resume, tmp_path / "minimal.pdf"))
+    assert "Ada Lovelace" in _text_of(render_resume(resume, tmp_path / "minimal.pdf").path)
 
 
 def test_an_education_entry_without_a_qualification_renders(tmp_path, generated_resume):
@@ -233,7 +339,7 @@ def test_an_education_entry_without_a_qualification_renders(tmp_path, generated_
     )
     resume = generated_resume.model_copy(update={"education": (sparse,)})
 
-    assert "Somewhere" in _text_of(render_resume(resume, tmp_path / "sparse.pdf"))
+    assert "Somewhere" in _text_of(render_resume(resume, tmp_path / "sparse.pdf").path)
 
 
 def test_a_resume_with_no_contact_details_at_all_still_renders(tmp_path, generated_resume):
@@ -245,7 +351,7 @@ def test_a_resume_with_no_contact_details_at_all_still_renders(tmp_path, generat
     )
     resume = generated_resume.model_copy(update={"personal": nameless})
 
-    assert "Ada Lovelace" in _text_of(render_resume(resume, tmp_path / "no-contact.pdf"))
+    assert "Ada Lovelace" in _text_of(render_resume(resume, tmp_path / "no-contact.pdf").path)
 
 
 def test_a_project_with_no_technologies_renders(tmp_path, generated_resume):
@@ -253,14 +359,14 @@ def test_a_project_with_no_technologies_renders(tmp_path, generated_resume):
     bare = first.model_copy(update={"technologies": ()})
     resume = generated_resume.model_copy(update={"projects": (bare, *rest)})
 
-    assert bare.subtitle in _text_of(render_resume(resume, tmp_path / "no-tech.pdf"))
+    assert bare.subtitle in _text_of(render_resume(resume, tmp_path / "no-tech.pdf").path)
 
 
 def test_an_experience_with_only_a_start_date_renders(tmp_path, generated_resume):
     entry = generated_resume.experiences[0].model_copy(update={"end_date": None})
     resume = generated_resume.model_copy(update={"experiences": (entry,)})
 
-    assert "May 2025" in _text_of(render_resume(resume, tmp_path / "open-ended.pdf"))
+    assert "May 2025" in _text_of(render_resume(resume, tmp_path / "open-ended.pdf").path)
 
 
 # --- failure handling -----------------------------------------------------
@@ -326,3 +432,18 @@ def _text_of(path):
 def _flatten(text: str) -> str:
     """Collapse the line breaks the renderer introduced by wrapping."""
     return " ".join(text.split())
+
+
+def test_an_unlayoutable_document_is_reported_as_a_rendering_error(
+    tmp_path, generated_resume, monkeypatch
+):
+    """ReportLab raises when a flowable cannot fit at all; that must not escape raw."""
+    from reportlab.platypus.doctemplate import LayoutError
+
+    def refuse(*_args, **_kwargs):
+        raise LayoutError("flowable too large on page")
+
+    monkeypatch.setattr("resumelab.rendering.pdf_renderer.SimpleDocTemplate.build", refuse)
+
+    with pytest.raises(PDFRenderingError, match="could not be laid out"):
+        render_resume(generated_resume, tmp_path / "impossible.pdf")

@@ -41,6 +41,17 @@ DETAIL_FONT_SIZE = 8.8
 LEADING_RATIO = 1.22
 """Line spacing as a multiple of font size. Tight, but still readable."""
 
+MIN_BODY_FONT_SIZE = 8.5
+"""The floor. Below this a resume is harder to read than it is to fit."""
+
+LAYOUT_SCALES = (1.0, 0.96, 0.92, 0.895)
+"""Progressively tighter layouts, tried in order until the content fits one page.
+
+The last entry is the tightest permitted: it holds the body text at
+:data:`MIN_BODY_FONT_SIZE`. Content that still overflows there is left to overflow
+rather than shrunk into something nobody will read.
+"""
+
 # --- colour -----------------------------------------------------------------
 INK = HexColor("#111111")
 """Near-black rather than pure black; easier to read and prints identically."""
@@ -88,83 +99,93 @@ DATE_RANGE_SEPARATOR = " \u2013 "
 """En dash, the typographic convention for a span of dates."""
 
 
+def _scaled(points: float, scale: float) -> float:
+    """Apply the layout scale to a measurement, rounded to a stable value."""
+    return round(points * scale, 2)
+
+
 def _leading(size: float) -> float:
     return round(size * LEADING_RATIO, 2)
 
 
-def build_stylesheet() -> dict[str, ParagraphStyle]:
+def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
     """Build every paragraph style the renderer uses.
+
+    Args:
+        scale: Multiplier applied to every font size and every vertical space, used
+            to tighten the page when content slightly overflows. Type and spacing
+            scale together, so the proportions of the page are preserved rather than
+            the text being squeezed into unchanged whitespace.
 
     Returns:
         Styles keyed by role: ``name``, ``contact``, ``section``, ``entry``,
         ``detail``, ``body``, and ``bullet``.
     """
+    body = _scaled(BODY_FONT_SIZE, scale)
+    detail = _scaled(DETAIL_FONT_SIZE, scale)
+    entry = _scaled(ENTRY_FONT_SIZE, scale)
+
+    def style(name: str, **overrides: object) -> ParagraphStyle:
+        """Apply the defaults shared by every style, so each entry states only its own."""
+        return ParagraphStyle(name, **{"textColor": INK, "alignment": TA_LEFT, **overrides})
+
     return {
-        "name": ParagraphStyle(
+        "name": style(
             "name",
             fontName=FONT_BOLD,
-            fontSize=NAME_FONT_SIZE,
-            leading=_leading(NAME_FONT_SIZE),
+            fontSize=_scaled(NAME_FONT_SIZE, scale),
+            leading=_leading(_scaled(NAME_FONT_SIZE, scale)),
             alignment=TA_CENTER,
-            textColor=INK,
-            spaceAfter=SPACE_AFTER_NAME,
+            spaceAfter=_scaled(SPACE_AFTER_NAME, scale),
         ),
-        "contact": ParagraphStyle(
+        "contact": style(
             "contact",
             fontName=FONT_REGULAR,
-            fontSize=CONTACT_FONT_SIZE,
-            leading=_leading(CONTACT_FONT_SIZE),
+            fontSize=_scaled(CONTACT_FONT_SIZE, scale),
+            leading=_leading(_scaled(CONTACT_FONT_SIZE, scale)),
             alignment=TA_CENTER,
             textColor=MUTED_INK,
-            spaceAfter=SPACE_AFTER_CONTACT,
+            spaceAfter=_scaled(SPACE_AFTER_CONTACT, scale),
         ),
-        "section": ParagraphStyle(
+        "section": style(
             "section",
             fontName=FONT_BOLD,
-            fontSize=SECTION_FONT_SIZE,
-            leading=_leading(SECTION_FONT_SIZE),
-            alignment=TA_LEFT,
-            textColor=INK,
-            spaceBefore=SPACE_BEFORE_SECTION,
-            spaceAfter=SPACE_AFTER_SECTION_HEADING,
+            fontSize=_scaled(SECTION_FONT_SIZE, scale),
+            leading=_leading(_scaled(SECTION_FONT_SIZE, scale)),
+            spaceBefore=_scaled(SPACE_BEFORE_SECTION, scale),
+            spaceAfter=_scaled(SPACE_AFTER_SECTION_HEADING, scale),
         ),
-        "entry": ParagraphStyle(
+        "entry": style(
             "entry",
             fontName=FONT_REGULAR,
-            fontSize=ENTRY_FONT_SIZE,
-            leading=_leading(ENTRY_FONT_SIZE),
-            alignment=TA_LEFT,
-            textColor=INK,
-            spaceAfter=SPACE_AFTER_ENTRY_HEADING,
+            fontSize=entry,
+            leading=_leading(entry),
+            spaceBefore=_scaled(SPACE_BETWEEN_ENTRIES, scale),
+            spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING, scale),
         ),
-        "detail": ParagraphStyle(
+        "detail": style(
             "detail",
             fontName=FONT_ITALIC,
-            fontSize=DETAIL_FONT_SIZE,
-            leading=_leading(DETAIL_FONT_SIZE),
-            alignment=TA_LEFT,
+            fontSize=detail,
+            leading=_leading(detail),
             textColor=MUTED_INK,
-            spaceAfter=SPACE_AFTER_ENTRY_HEADING,
+            spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING, scale),
         ),
-        "body": ParagraphStyle(
+        "body": style(
             "body",
             fontName=FONT_REGULAR,
-            fontSize=BODY_FONT_SIZE,
-            leading=_leading(BODY_FONT_SIZE),
-            alignment=TA_LEFT,
-            textColor=INK,
+            fontSize=body,
+            leading=_leading(body),
         ),
-        "bullet": ParagraphStyle(
+        "bullet": style(
             "bullet",
             fontName=FONT_REGULAR,
-            fontSize=BODY_FONT_SIZE,
-            leading=_leading(BODY_FONT_SIZE),
-            alignment=TA_LEFT,
-            textColor=INK,
-            leftIndent=BULLET_TEXT_INDENT,
-            bulletIndent=BULLET_INDENT,
-            bulletFontSize=BULLET_FONT_SIZE,
-            bulletOffsetY=BULLET_OFFSET_Y,
-            spaceAfter=SPACE_BETWEEN_BULLETS,
+            fontSize=body,
+            leading=_leading(body),
+            leftIndent=_scaled(BULLET_TEXT_INDENT, scale),
+            bulletIndent=_scaled(BULLET_INDENT, scale),
+            bulletFontSize=_scaled(BULLET_FONT_SIZE, scale),
+            bulletOffsetY=_scaled(BULLET_OFFSET_Y, scale),
+            spaceAfter=_scaled(SPACE_BETWEEN_BULLETS, scale),
         ),
     }

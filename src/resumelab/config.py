@@ -21,6 +21,13 @@ from pydantic import Field, SecretStr, ValidationError, field_validator, model_v
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 from resumelab.exceptions import ConfigurationError
+from resumelab.models.candidate import REQUIRED_PROJECT_BULLET_COUNT
+from resumelab.models.resume import (
+    MAX_BULLET_CHARACTERS,
+    MAX_SUMMARY_CHARACTERS,
+    REQUIRED_EXPERIENCE_BULLET_COUNT,
+    ResumeLimits,
+)
 from resumelab.utils.errors import describe_validation_error
 
 LogLevel = Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"]
@@ -120,6 +127,32 @@ class Settings(BaseSettings):
         ),
     )
 
+    # --- resume length budget ----------------------------------------------
+    summary_max_characters: int = Field(
+        default=MAX_SUMMARY_CHARACTERS,
+        ge=80,
+        le=600,
+        description="Longest professional summary this run will accept.",
+    )
+    bullet_max_characters: int = Field(
+        default=MAX_BULLET_CHARACTERS,
+        ge=80,
+        le=400,
+        description="Longest bullet this run will accept, before condensation.",
+    )
+    experience_bullet_count: int = Field(
+        default=REQUIRED_EXPERIENCE_BULLET_COUNT,
+        ge=1,
+        le=6,
+        description="Bullets to emit per role.",
+    )
+    project_bullet_count: int = Field(
+        default=REQUIRED_PROJECT_BULLET_COUNT,
+        ge=1,
+        le=6,
+        description="Bullets to emit per project.",
+    )
+
     # --- paths --------------------------------------------------------------
     candidate_profile_path: Path = Field(
         default=Path("data/candidate_profile.yaml"),
@@ -204,6 +237,16 @@ class Settings(BaseSettings):
         if provider is LLMProvider.OPENAI:
             return self.openai_api_key
         return self.anthropic_api_key
+
+    @property
+    def resume_limits(self) -> ResumeLimits:
+        """The length budget this run targets."""
+        return ResumeLimits(
+            summary_max_characters=self.summary_max_characters,
+            bullet_max_characters=self.bullet_max_characters,
+            experience_bullet_count=self.experience_bullet_count,
+            project_bullet_count=self.project_bullet_count,
+        )
 
     @property
     def runs_dir(self) -> Path:

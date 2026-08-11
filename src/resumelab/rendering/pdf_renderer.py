@@ -14,13 +14,16 @@ break extraction.
 
 from __future__ import annotations
 
+import io
 import logging
 from collections.abc import Iterable
+from dataclasses import dataclass
 from pathlib import Path
 from xml.sax.saxutils import escape
 
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.platypus import Flowable, HRFlowable, Paragraph, SimpleDocTemplate
+from reportlab.platypus.doctemplate import LayoutError
 
 from resumelab.exceptions import PDFRenderingError
 from resumelab.models.candidate import Education, PersonalDetails
@@ -35,40 +38,106 @@ from resumelab.rendering import styles
 logger = logging.getLogger(__name__)
 
 
-def render_resume(resume: GeneratedResume, output_path: Path) -> Path:
-    """Render ``resume`` to a PDF at ``output_path``.
+@dataclass(frozen=True, slots=True)
+class RenderResult:
+    """What rendering produced, and what it had to do to get there."""
+
+    path: Path
+    scale: float
+    """The layout scale used. 1.0 means nothing had to be tightened."""
+
+    page_count: int
+
+    @property
+    def fits_on_one_page(self) -> bool:
+        return self.page_count == 1
+
+    @property
+    def was_tightened(self) -> bool:
+        return self.scale < 1.0
+
+
+def render_resume(resume: GeneratedResume, output_path: Path) -> RenderResult:
+    """Render ``resume`` to a PDF at ``output_path``, fitting one page if it can.
+
+    Progressively tighter layouts are tried until the content fits a single page.
+    Each attempt is built in memory and only the chosen one is written, so the file
+    on disk is never a discarded draft.
+
+    Content that still overflows at the tightest permitted layout is written at that
+    layout and reported as overflowing. Shrinking further would trade a readable
+    two-page resume for an unreadable one-page resume, which is the wrong trade; the
+    caller decides whether to condense the content instead.
 
     Args:
         resume: The validated resume to draw.
         output_path: Where to write the PDF. Parent directories are created.
 
     Returns:
-        The path written.
+        A :class:`RenderResult` describing the layout that was used.
 
     Raises:
-        PDFRenderingError: If the document could not be written.
+        PDFRenderingError: If the document could not be built or written.
     """
     logger.info("rendering PDF output=%s", output_path)
 
-    stylesheet = styles.build_stylesheet()
+    payload, page_count, scale = b"", 0, styles.LAYOUT_SCALES[0]
+    for candidate in styles.LAYOUT_SCALES:
+        scale = candidate
+        payload, page_count = _build_document(resume, candidate)
+        if page_count == 1:
+            break
+        logger.debug("layout overflowed pages=%d scale=%.3f", page_count, candidate)
+
+    if page_count > 1:
+        logger.warning(
+            "resume does not fit one page at the tightest permitted layout "
+            "pages=%d scale=%.3f: condense the content rather than shrinking it further",
+            page_count,
+            scale,
+        )
+    elif scale < 1.0:
+        logger.info("tightened layout to fit one page scale=%.3f", scale)
+
+    _write(payload, output_path)
+    logger.info(
+        "rendered PDF output=%s bytes=%d pages=%d scale=%.3f",
+        output_path,
+        output_path.stat().st_size,
+        page_count,
+        scale,
+    )
+    return RenderResult(path=output_path, scale=scale, page_count=page_count)
+
+
+def _build_document(resume: GeneratedResume, scale: float) -> tuple[bytes, int]:
+    """Build the document in memory at ``scale``, returning its bytes and page count."""
+    buffer = io.BytesIO()
+    document = SimpleDocTemplate(
+        buffer,
+        pagesize=styles.PAGE_SIZE,
+        leftMargin=styles.MARGIN_HORIZONTAL,
+        rightMargin=styles.MARGIN_HORIZONTAL,
+        topMargin=styles.MARGIN_TOP,
+        bottomMargin=styles.MARGIN_BOTTOM,
+        title=f"{resume.personal.name} — Resume",
+        author=resume.personal.name,
+    )
+    try:
+        document.build(list(_build_story(resume, styles.build_stylesheet(scale))))
+    except LayoutError as exc:
+        raise PDFRenderingError(
+            f"The resume could not be laid out at scale {scale}: {exc}"
+        ) from exc
+    return buffer.getvalue(), document.page
+
+
+def _write(payload: bytes, output_path: Path) -> None:
     try:
         output_path.parent.mkdir(parents=True, exist_ok=True)
-        document = SimpleDocTemplate(
-            str(output_path),
-            pagesize=styles.PAGE_SIZE,
-            leftMargin=styles.MARGIN_HORIZONTAL,
-            rightMargin=styles.MARGIN_HORIZONTAL,
-            topMargin=styles.MARGIN_TOP,
-            bottomMargin=styles.MARGIN_BOTTOM,
-            title=f"{resume.personal.name} — Resume",
-            author=resume.personal.name,
-        )
-        document.build(list(_build_story(resume, stylesheet)))
+        output_path.write_bytes(payload)
     except OSError as exc:
         raise PDFRenderingError(f"Could not write the resume to {output_path}: {exc}") from exc
-
-    logger.info("rendered PDF output=%s bytes=%d", output_path, output_path.stat().st_size)
-    return output_path
 
 
 def _build_story(

@@ -11,7 +11,7 @@ from __future__ import annotations
 import re
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, model_validator
+from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
 
 from resumelab.models.candidate import (
     REQUIRED_PROJECT_BULLET_COUNT,
@@ -64,6 +64,26 @@ MIN_SUMMARY_CHARACTERS = 60
 
 MAX_SUMMARY_CHARACTERS = 300
 """Roughly two lines at resume body size. Longer summaries stop being read."""
+
+
+class ResumeLimits(BaseModel):
+    """The length budget a run targets.
+
+    These are the limits a finished resume is checked against before rendering, and
+    the targets a condensation pass works toward. They are configurable so a study
+    can vary how much room the format allows without touching code.
+
+    The response schemas carry their own hard bounds, which is what stops a provider
+    returning something structurally unusable. These are the tighter, run-specific
+    budget layered on top.
+    """
+
+    model_config = ConfigDict(frozen=True)
+
+    summary_max_characters: int = MAX_SUMMARY_CHARACTERS
+    bullet_max_characters: int = MAX_BULLET_CHARACTERS
+    experience_bullet_count: int = REQUIRED_EXPERIENCE_BULLET_COUNT
+    project_bullet_count: int = REQUIRED_PROJECT_BULLET_COUNT
 
 
 def _normalize_summary(value: str) -> str:
@@ -303,6 +323,20 @@ class GeneratedExperience(BaseModel):
     start_date: str | None
     end_date: str | None
     bullets: tuple[str, ...]
+
+
+class CondensedContent(BaseModel):
+    """Shortened replacements for a resume's prose, in the order they appear.
+
+    The bullets come back as one flat list covering the whole document, because
+    shortening is a whole-page decision: which bullet gives up a clause depends on
+    what the others are already carrying.
+    """
+
+    model_config = GENERATED_MODEL_CONFIG
+
+    summary: SummaryText
+    bullets: tuple[BulletText, ...]
 
 
 class GeneratedResume(BaseModel):

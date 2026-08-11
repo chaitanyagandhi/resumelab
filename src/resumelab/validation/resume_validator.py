@@ -16,37 +16,38 @@ from __future__ import annotations
 import logging
 
 from resumelab.exceptions import ResumeValidationError
-from resumelab.models.candidate import (
-    REQUIRED_PROJECT_BULLET_COUNT,
-    REQUIRED_PROJECT_COUNT,
-)
+from resumelab.models.candidate import REQUIRED_PROJECT_COUNT
 from resumelab.models.resume import (
-    MAX_BULLET_CHARACTERS,
     MIN_BULLET_CHARACTERS,
     GeneratedResume,
+    ResumeLimits,
 )
 from resumelab.utils.text import control_characters
 
 logger = logging.getLogger(__name__)
 
 
-def validate_resume(resume: GeneratedResume) -> None:
+def validate_resume(resume: GeneratedResume, limits: ResumeLimits | None = None) -> None:
     """Check ``resume`` is fit to render.
 
     Args:
         resume: The assembled resume.
+        limits: The run's length budget. Defaults to the standard limits, which match
+            the bounds the generation stages already enforce.
 
     Raises:
         ResumeValidationError: If any check fails. The message lists every problem
             found, not just the first.
     """
+    budget = limits or ResumeLimits()
     logger.info("validating generated resume")
 
     problems: list[str] = []
     _check_identity(resume, problems)
     _check_sections_exist(resume, problems)
-    _check_projects(resume, problems)
-    _check_bullets(resume, problems)
+    _check_summary_length(resume, budget, problems)
+    _check_projects(resume, budget, problems)
+    _check_bullets(resume, budget, problems)
     _check_text_hygiene(resume, problems)
 
     if problems:
@@ -82,17 +83,33 @@ def _check_sections_exist(resume: GeneratedResume, problems: list[str]) -> None:
         problems.append("there are no skills")
 
 
-def _check_projects(resume: GeneratedResume, problems: list[str]) -> None:
+def _check_summary_length(
+    resume: GeneratedResume,
+    budget: ResumeLimits,
+    problems: list[str],
+) -> None:
+    if len(resume.summary) > budget.summary_max_characters:
+        problems.append(
+            f"the summary is {len(resume.summary)} characters, over the "
+            f"{budget.summary_max_characters} allowed for this run"
+        )
+
+
+def _check_projects(
+    resume: GeneratedResume,
+    budget: ResumeLimits,
+    problems: list[str],
+) -> None:
     """Project counts are the research design, so a drift here invalidates the run."""
     if len(resume.projects) != REQUIRED_PROJECT_COUNT:
         problems.append(
             f"expected exactly {REQUIRED_PROJECT_COUNT} projects, found {len(resume.projects)}"
         )
     for project in resume.projects:
-        if len(project.bullets) != REQUIRED_PROJECT_BULLET_COUNT:
+        if len(project.bullets) != budget.project_bullet_count:
             problems.append(
                 f"project {project.name!r} has {len(project.bullets)} bullets, "
-                f"expected exactly {REQUIRED_PROJECT_BULLET_COUNT}"
+                f"expected exactly {budget.project_bullet_count}"
             )
         if not project.subtitle.strip():
             problems.append(f"project {project.name!r} has no subtitle")
@@ -100,23 +117,38 @@ def _check_projects(resume: GeneratedResume, problems: list[str]) -> None:
             problems.append(f"project {project.name!r} names no technologies")
 
 
-def _check_bullets(resume: GeneratedResume, problems: list[str]) -> None:
+def _check_bullets(
+    resume: GeneratedResume,
+    budget: ResumeLimits,
+    problems: list[str],
+) -> None:
     for experience in resume.experiences:
+        where = f"experience {experience.company!r}"
         if not experience.bullets:
-            problems.append(f"experience {experience.company!r} has no bullets")
-        _check_bullet_texts(experience.bullets, f"experience {experience.company!r}", problems)
+            problems.append(f"{where} has no bullets")
+        elif len(experience.bullets) != budget.experience_bullet_count:
+            problems.append(
+                f"{where} has {len(experience.bullets)} bullets, "
+                f"expected exactly {budget.experience_bullet_count}"
+            )
+        _check_bullet_texts(experience.bullets, where, budget, problems)
     for project in resume.projects:
-        _check_bullet_texts(project.bullets, f"project {project.name!r}", problems)
+        _check_bullet_texts(project.bullets, f"project {project.name!r}", budget, problems)
 
 
-def _check_bullet_texts(bullets: tuple[str, ...], where: str, problems: list[str]) -> None:
+def _check_bullet_texts(
+    bullets: tuple[str, ...],
+    where: str,
+    budget: ResumeLimits,
+    problems: list[str],
+) -> None:
     for index, bullet in enumerate(bullets, start=1):
         if not bullet.strip():
             problems.append(f"{where} bullet {index} is empty")
-        elif not MIN_BULLET_CHARACTERS <= len(bullet) <= MAX_BULLET_CHARACTERS:
+        elif not MIN_BULLET_CHARACTERS <= len(bullet) <= budget.bullet_max_characters:
             problems.append(
                 f"{where} bullet {index} is {len(bullet)} characters, expected between "
-                f"{MIN_BULLET_CHARACTERS} and {MAX_BULLET_CHARACTERS}"
+                f"{MIN_BULLET_CHARACTERS} and {budget.bullet_max_characters}"
             )
 
 

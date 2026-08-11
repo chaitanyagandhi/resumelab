@@ -1,6 +1,7 @@
 """The staged resume generation pipeline."""
 
 from resumelab.pipeline.assembler import assemble_resume
+from resumelab.pipeline.condenser import condense_resume
 from resumelab.pipeline.experience_transformer import transform_experiences
 from resumelab.pipeline.jd_analyzer import analyze_job_description
 from resumelab.pipeline.project_transformer import transform_projects
@@ -12,6 +13,7 @@ __all__ = [
     "analyze_job_description",
     "assemble_resume",
     "build_transformation_strategy",
+    "condense_resume",
     "generate_summary",
     "transform_experiences",
     "transform_projects",
