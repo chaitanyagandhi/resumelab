@@ -351,6 +351,41 @@ person, not a different project wearing its name.\
 """Repositions one project around the target identity."""
 
 
+SKILLS_PROMPT: Final = Prompt(
+    name="skills",
+    version=TRANSFORMATION_PROMPT_VERSION,
+    instructions="""\
+Build the skills section for this role.
+
+This section is read in about three seconds, and often by someone scanning for a \
+handful of specific terms. What appears first, and what appears at all, is the whole \
+job.
+
+You may reorder freely, promote what this employer cares about, drop skills that do \
+nothing for this application, and add skills that belong to the identity being \
+presented. Follow the strategy's skills_priority for what leads.
+
+Choose the groups yourself. The source profile's categories are one way to organize \
+this candidate, not the right way for this role — relabel them, merge them, or split \
+them so the grouping itself reflects what this employer is hiring for. A storage role \
+and a GenAI role should not produce the same headings. Between two and six groups, \
+each labeled in this employer's vocabulary.
+
+Two hard requirements:
+- Every technology named anywhere else on this resume must appear here. A reader who \
+sees a technology in a bullet and then cannot find it in the skills section notices, \
+and the section's credibility is what makes the rest of the resume readable.
+- Do not dump the job description's keyword list. A skills section that mirrors the \
+posting term for term is the most recognizable signature of a machine-tailored resume, \
+and it is what this section must not look like. Select what strengthens the identity; \
+leave the rest out.
+
+Omit proficiency ratings, years of experience, and soft skills. List the skill.\
+""",
+)
+"""Builds the skills section around the target identity."""
+
+
 def neutralize_fences(content: str) -> str:
     """Strip anything in ``content`` that could be mistaken for a fence marker.
 

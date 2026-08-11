@@ -14,7 +14,7 @@ from typing import Annotated
 from pydantic import AfterValidator, BaseModel, model_validator
 
 from resumelab.models.candidate import REQUIRED_PROJECT_BULLET_COUNT
-from resumelab.models.common import GENERATED_MODEL_CONFIG, clean_items
+from resumelab.models.common import GENERATED_MODEL_CONFIG, clean_items, require_content
 
 REQUIRED_EXPERIENCE_BULLET_COUNT = 3
 """Bullets emitted per role. A fixed count keeps runs comparable."""
@@ -30,6 +30,18 @@ MIN_PROJECT_TECHNOLOGIES = 2
 
 MAX_PROJECT_TECHNOLOGIES = 10
 """Beyond this the list stops being read and starts looking padded."""
+
+MIN_SKILL_GROUPS = 2
+"""One group is a wall of text; the section exists to be scannable."""
+
+MAX_SKILL_GROUPS = 6
+"""Enough to organize a stack, few enough to stay compact on one page."""
+
+MAX_SKILLS_PER_GROUP = 12
+"""A longer row wraps and stops being read."""
+
+MAX_TOTAL_SKILLS = 40
+"""A ceiling on the whole section, which is where keyword stuffing shows up."""
 
 MIN_BULLET_CHARACTERS = 40
 """Below this a bullet cannot carry implementation, detail, and impact."""
@@ -206,6 +218,70 @@ class GeneratedProject(BaseModel):
     date: str | None
     technologies: tuple[str, ...]
     bullets: tuple[str, ...]
+
+
+def _check_group_skills(values: tuple[str, ...]) -> tuple[str, ...]:
+    """Require a group to carry a readable number of skills."""
+    cleaned = clean_items(values)
+    if not cleaned:
+        raise ValueError("must list at least one skill")
+    if len(cleaned) > MAX_SKILLS_PER_GROUP:
+        raise ValueError(f"must list at most {MAX_SKILLS_PER_GROUP} skills, got {len(cleaned)}")
+    return cleaned
+
+
+class SkillGroup(BaseModel):
+    """One labeled row of the skills section, e.g. ``Languages: Go, Java, C``."""
+
+    model_config = GENERATED_MODEL_CONFIG
+
+    label: Annotated[str, AfterValidator(require_content)]
+    skills: Annotated[tuple[str, ...], AfterValidator(_check_group_skills)]
+
+
+class GeneratedSkills(BaseModel):
+    """The skills section, grouped as this role's reader would expect to see it.
+
+    The labels are chosen per run rather than inherited from the source profile: which
+    groupings make a candidate look aligned is itself part of the repositioning.
+    """
+
+    model_config = GENERATED_MODEL_CONFIG
+
+    groups: tuple[SkillGroup, ...]
+
+    @model_validator(mode="after")
+    def _check_groups(self) -> GeneratedSkills:
+        if not MIN_SKILL_GROUPS <= len(self.groups) <= MAX_SKILL_GROUPS:
+            raise ValueError(
+                f"must contain between {MIN_SKILL_GROUPS} and {MAX_SKILL_GROUPS} groups, "
+                f"got {len(self.groups)}"
+            )
+        _reject_duplicate_labels(self.groups)
+        _reject_duplicate_skills(self.groups)
+        if self.skill_count > MAX_TOTAL_SKILLS:
+            raise ValueError(
+                f"must list at most {MAX_TOTAL_SKILLS} skills in total, got {self.skill_count}"
+            )
+        return self
+
+    @property
+    def skill_count(self) -> int:
+        """Total skills across every group."""
+        return sum(len(group.skills) for group in self.groups)
+
+
+def _reject_duplicate_labels(groups: tuple[SkillGroup, ...]) -> None:
+    labels = [group.label.casefold() for group in groups]
+    if len(set(labels)) != len(labels):
+        raise ValueError("group labels must be distinct")
+
+
+def _reject_duplicate_skills(groups: tuple[SkillGroup, ...]) -> None:
+    """The same skill in two groups reads as carelessness."""
+    skills = [skill.casefold() for group in groups for skill in group.skills]
+    if len(set(skills)) != len(skills):
+        raise ValueError("a skill must not appear in more than one group")
 
 
 class GeneratedExperience(BaseModel):

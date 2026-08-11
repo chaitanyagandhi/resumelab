@@ -3,6 +3,7 @@
 from resumelab.pipeline.experience_transformer import transform_experiences
 from resumelab.pipeline.jd_analyzer import analyze_job_description
 from resumelab.pipeline.project_transformer import transform_projects
+from resumelab.pipeline.skills_transformer import transform_skills
 from resumelab.pipeline.strategist import build_transformation_strategy
 from resumelab.pipeline.summary_generator import generate_summary
 
@@ -12,4 +13,5 @@ __all__ = [
     "generate_summary",
     "transform_experiences",
     "transform_projects",
+    "transform_skills",
 ]
