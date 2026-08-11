@@ -8,11 +8,27 @@ rather than being truncated mid-sentence.
 
 from __future__ import annotations
 
+import re
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel
+from pydantic import AfterValidator, BaseModel, model_validator
 
 from resumelab.models.common import GENERATED_MODEL_CONFIG
+
+REQUIRED_EXPERIENCE_BULLET_COUNT = 3
+"""Bullets emitted per role. A fixed count keeps runs comparable."""
+
+MIN_BULLET_CHARACTERS = 40
+"""Below this a bullet cannot carry implementation, detail, and impact."""
+
+MAX_BULLET_CHARACTERS = 220
+"""Roughly two lines. Longer bullets are skimmed past on a one-page resume."""
+
+_LIST_MARKER = re.compile("^\\s*(?:[-*\\u2022\\u2013\\u2014]|\\d+[.)])\\s+")
+"""A leading bullet glyph or numbering the renderer would draw a second time.
+
+The escapes are bullet, en dash, and em dash, which models reach for interchangeably.
+"""
 
 MIN_SUMMARY_CHARACTERS = 60
 """Below this a summary establishes no technical identity at all."""
@@ -52,3 +68,73 @@ class GeneratedSummary(BaseModel):
     model_config = GENERATED_MODEL_CONFIG
 
     summary: SummaryText
+
+
+def _normalize_bullet(value: str) -> str:
+    """Clean a bullet and hold it to one readable line.
+
+    A leading glyph is stripped rather than rejected: the renderer draws its own, and
+    a model that adds one has made a formatting slip, not a content error.
+    """
+    collapsed = " ".join(_LIST_MARKER.sub("", value).split())
+    if not collapsed:
+        raise ValueError("must not be empty")
+    if len(collapsed) < MIN_BULLET_CHARACTERS:
+        raise ValueError(
+            f"must be at least {MIN_BULLET_CHARACTERS} characters, got {len(collapsed)}"
+        )
+    if len(collapsed) > MAX_BULLET_CHARACTERS:
+        raise ValueError(
+            f"must be at most {MAX_BULLET_CHARACTERS} characters, got {len(collapsed)}"
+        )
+    return collapsed
+
+
+BulletText = Annotated[str, AfterValidator(_normalize_bullet)]
+"""One resume bullet, cleaned and bounded to a readable length."""
+
+
+def _reject_repeated_bullets(bullets: tuple[str, ...]) -> tuple[str, ...]:
+    """Two identical bullets waste a third of a section, so they are worth repairing."""
+    seen = {bullet.casefold() for bullet in bullets}
+    if len(seen) != len(bullets):
+        raise ValueError("bullets must not repeat")
+    return bullets
+
+
+class ExperienceBullets(BaseModel):
+    """The rewritten bullets for one role.
+
+    Only the bullets are generated. Company, title, dates, and location are factual
+    anchors copied from the source profile, so they cannot drift in a rewrite.
+    """
+
+    model_config = GENERATED_MODEL_CONFIG
+
+    bullets: Annotated[tuple[BulletText, ...], AfterValidator(_reject_repeated_bullets)]
+
+    @model_validator(mode="after")
+    def _check_bullet_count(self) -> ExperienceBullets:
+        if len(self.bullets) != REQUIRED_EXPERIENCE_BULLET_COUNT:
+            raise ValueError(
+                f"must contain exactly {REQUIRED_EXPERIENCE_BULLET_COUNT} bullets, "
+                f"got {len(self.bullets)}"
+            )
+        return self
+
+
+class GeneratedExperience(BaseModel):
+    """One role as it appears on the generated resume.
+
+    Assembled rather than generated: the anchors come straight from the source
+    profile and the bullets from :class:`ExperienceBullets`.
+    """
+
+    model_config = GENERATED_MODEL_CONFIG
+
+    company: str
+    title: str
+    location: str | None
+    start_date: str | None
+    end_date: str | None
+    bullets: tuple[str, ...]

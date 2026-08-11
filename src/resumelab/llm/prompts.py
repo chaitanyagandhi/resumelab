@@ -267,6 +267,45 @@ Keep it under 300 characters. A summary that runs long stops being read.\
 """Writes the summary that establishes the transformed identity."""
 
 
+EXPERIENCE_PROMPT: Final = Prompt(
+    name="experience",
+    version=TRANSFORMATION_PROMPT_VERSION,
+    instructions="""\
+Rewrite the bullets for the one role in SOURCE EXPERIENCE, following its direction. \
+Write exactly three.
+
+The company, title, dates, and location are fixed and are not yours to write. What \
+that role appears to have been about is entirely yours. Reframe the work, change the \
+technologies it appears to have been built on, introduce the architecture and domain \
+concepts the direction assigns, and write concrete quantified impact. The source \
+bullets are raw material, not a draft to edit.
+
+Every bullet needs all three of:
+- a strong, specific opening verb — Built, Designed, Rearchitected, Instrumented, \
+Cut, Scaled. Never "Responsible for", "Helped with", "Worked on", or "Assisted".
+- what was actually built, in enough technical detail that an engineer could picture \
+the implementation. Name the components, the protocols, the data structures.
+- what changed as a result, quantified. Latency, throughput, scale, cost, time.
+
+Constraints that decide whether this reads as a real resume:
+- Use a different opening verb in each bullet, and do not reuse any verb that already \
+appears in BULLETS ALREADY WRITTEN ELSEWHERE ON THIS RESUME. Repeated verbs are the \
+clearest signal of machine-written bullets.
+- Do not restate anything already claimed elsewhere on the resume. Each bullet earns \
+its space by adding something new.
+- Use the terms this entry's direction assigns. Do not reach for every keyword in the \
+job analysis; a bullet stuffed with unrelated technologies is not credible, and \
+credibility is what the transformation depends on.
+- Never copy phrasing from the job description. Requirements are written as requests; \
+bullets are written as accomplishments. Convert, do not quote.
+- Keep each bullet to a single line, under 220 characters.
+- Numbers should be plausible for the scale implied by the source material. A student \
+project does not serve ten million requests per second.\
+""",
+)
+"""Rewrites one role's bullets around the target identity."""
+
+
 def neutralize_fences(content: str) -> str:
     """Strip anything in ``content`` that could be mistaken for a fence marker.
 

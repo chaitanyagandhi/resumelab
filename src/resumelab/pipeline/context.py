@@ -13,11 +13,13 @@ contact details out of every provider's logs.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
+
 from pydantic import BaseModel
 
 from resumelab.llm.prompts import Section
 from resumelab.models.analysis import JobAnalysis
-from resumelab.models.candidate import CandidateProfile
+from resumelab.models.candidate import CandidateProfile, Experience
 from resumelab.models.strategy import TransformationStrategy
 
 EXCLUDED_FROM_PROMPTS: set[str] = {"personal"}
@@ -44,3 +46,25 @@ def analysis_section(analysis: JobAnalysis) -> Section:
 def strategy_section(strategy: TransformationStrategy) -> Section:
     """Render the global plan every rewriting stage works from."""
     return Section(label="TRANSFORMATION STRATEGY", content=_as_json(strategy))
+
+
+def source_experience_section(experience: Experience) -> Section:
+    """Render the one role currently being rewritten."""
+    return Section(label="SOURCE EXPERIENCE", content=_as_json(experience))
+
+
+def direction_section(direction: BaseModel) -> Section:
+    """Render this entry's slice of the plan, so its assignment is unmissable."""
+    return Section(label="DIRECTION FOR THIS ENTRY", content=_as_json(direction))
+
+
+def already_written_section(bullets: Sequence[str]) -> Section:
+    """Render bullets written earlier in the run.
+
+    Each entry is rewritten in its own call, so without this the stages cannot see
+    each other and converge on the same verbs and the same claimed impact.
+    """
+    return Section(
+        label="BULLETS ALREADY WRITTEN ELSEWHERE ON THIS RESUME",
+        content="\n".join(f"- {bullet}" for bullet in bullets),
+    )
