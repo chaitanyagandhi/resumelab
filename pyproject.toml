@@ -114,6 +114,9 @@ addopts = [
     "-ra",
     "--strict-markers",
     "--strict-config",
+    # Tests that spend real money are opt-in: run them with `pytest -m e2e`.
+    "-m",
+    "not e2e",
     "--cov=resumelab",
     "--cov-report=term-missing",
 ]
