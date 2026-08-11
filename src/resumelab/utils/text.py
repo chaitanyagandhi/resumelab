@@ -7,9 +7,31 @@ prompting, validation, and PDF rendering — working on consistent UTF-8 text.
 
 from __future__ import annotations
 
+import re
 import unicodedata
 
 _PRESERVED_CONTROL_CHARACTERS = frozenset("\n\t")
+
+
+MAX_SLUG_LENGTH = 40
+"""Keeps run directory names readable and well inside filesystem limits."""
+
+FALLBACK_SLUG = "run"
+"""Used when a label reduces to nothing, so a directory always has a name."""
+
+_NON_SLUG = re.compile(r"[^a-z0-9]+")
+
+
+def slugify(value: str, *, max_length: int = MAX_SLUG_LENGTH) -> str:
+    """Reduce ``value`` to a safe file name component.
+
+    Everything outside ``a-z0-9`` becomes a hyphen, so a label taken from user input
+    cannot introduce a path separator, a parent reference, or a hidden file. A label
+    that reduces to nothing falls back to :data:`FALLBACK_SLUG`.
+    """
+    normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
+    slug = _NON_SLUG.sub("-", normalized.lower()).strip("-")[:max_length].strip("-")
+    return slug or FALLBACK_SLUG
 
 
 def control_characters(value: str) -> list[str]:

@@ -7,9 +7,25 @@ and re-raised as whichever domain error the caller owns.
 
 from __future__ import annotations
 
+import hashlib
 from pathlib import Path
 
 from resumelab.exceptions import ResumeLabError
+
+_HASH_CHUNK_BYTES = 65_536
+
+
+def sha256_of_file(path: Path) -> str:
+    """Return the SHA-256 of ``path``'s bytes.
+
+    Recorded in every run's metadata so two runs can be shown to have used the same
+    source profile — the comparison the whole experiment rests on.
+    """
+    digest = hashlib.sha256()
+    with path.open("rb") as handle:
+        for chunk in iter(lambda: handle.read(_HASH_CHUNK_BYTES), b""):
+            digest.update(chunk)
+    return digest.hexdigest()
 
 
 def read_text_file(
