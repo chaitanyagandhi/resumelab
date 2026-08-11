@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from resumelab.llm.prompts import Section
 from resumelab.models.analysis import JobAnalysis
 from resumelab.models.candidate import CandidateProfile
+from resumelab.models.strategy import TransformationStrategy
 
 EXCLUDED_FROM_PROMPTS: set[str] = {"personal"}
 """Profile sections withheld from every prompt."""
@@ -38,3 +39,8 @@ def profile_section(profile: CandidateProfile) -> Section:
 def analysis_section(analysis: JobAnalysis) -> Section:
     """Render the structured job analysis produced by the previous stage."""
     return Section(label="JOB ANALYSIS", content=_as_json(analysis))
+
+
+def strategy_section(strategy: TransformationStrategy) -> Section:
+    """Render the global plan every rewriting stage works from."""
+    return Section(label="TRANSFORMATION STRATEGY", content=_as_json(strategy))

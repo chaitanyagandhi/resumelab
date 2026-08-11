@@ -233,6 +233,40 @@ it appears to be built on, is expected.\
 """Plans the repositioning that later stages execute."""
 
 
+SUMMARY_PROMPT: Final = Prompt(
+    name="summary",
+    version=TRANSFORMATION_PROMPT_VERSION,
+    instructions="""\
+Write the professional summary that opens the resume, following the strategy's \
+summary_direction.
+
+One or two lines. It is the first thing read, and it decides how everything below it \
+is interpreted, so it must establish the target technical identity immediately.
+
+Open with what this engineer is, not with wanting to be it. Name the concrete \
+technologies and problem domains that define the identity — the specific ones this \
+employer cares about, not a category label. A reader should finish the first clause \
+already knowing which kind of engineer this is.
+
+Never write any of these, or anything like them:
+- "Passionate software engineer seeking opportunities to..."
+- "Motivated developer with a strong desire to learn..."
+- "Results-driven professional with excellent communication skills"
+- "Looking to leverage my skills in a challenging environment"
+
+They say nothing, and they read as a candidate with nothing specific to claim. \
+Every clause must carry information a hiring manager could act on.
+
+Write in the third person with the subject implied, as resumes do: "Storage \
+infrastructure engineer who builds..." rather than "I build..." or "He builds...". \
+No name, no pronouns. Use the strategy's tone.
+
+Keep it under 300 characters. A summary that runs long stops being read.\
+""",
+)
+"""Writes the summary that establishes the transformed identity."""
+
+
 def neutralize_fences(content: str) -> str:
     """Strip anything in ``content`` that could be mistaken for a fence marker.
 

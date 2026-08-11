@@ -19,6 +19,11 @@ from resumelab.models.job import (
     JobDescription,
     JobDescriptionSource,
 )
+from resumelab.models.resume import (
+    MAX_SUMMARY_CHARACTERS,
+    MIN_SUMMARY_CHARACTERS,
+    GeneratedSummary,
+)
 from resumelab.models.strategy import (
     ExperienceDirection,
     ProjectDirection,
@@ -28,14 +33,17 @@ from resumelab.models.strategy import (
 __all__ = [
     "MAX_JOB_DESCRIPTION_CHARACTERS",
     "MAX_LIST_ITEMS",
+    "MAX_SUMMARY_CHARACTERS",
     "MIN_EXPERIENCE_BULLET_COUNT",
     "MIN_JOB_DESCRIPTION_CHARACTERS",
+    "MIN_SUMMARY_CHARACTERS",
     "REQUIRED_PROJECT_BULLET_COUNT",
     "REQUIRED_PROJECT_COUNT",
     "CandidateProfile",
     "Education",
     "Experience",
     "ExperienceDirection",
+    "GeneratedSummary",
     "JobAnalysis",
     "JobDescription",
     "JobDescriptionSource",
