@@ -13,10 +13,23 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, model_validator
 
-from resumelab.models.common import GENERATED_MODEL_CONFIG
+from resumelab.models.candidate import REQUIRED_PROJECT_BULLET_COUNT
+from resumelab.models.common import GENERATED_MODEL_CONFIG, clean_items
 
 REQUIRED_EXPERIENCE_BULLET_COUNT = 3
 """Bullets emitted per role. A fixed count keeps runs comparable."""
+
+MIN_SUBTITLE_CHARACTERS = 10
+"""Below this a subtitle says nothing about what the project is."""
+
+MAX_SUBTITLE_CHARACTERS = 90
+"""Long enough to reposition a project, short enough to stay on one line."""
+
+MIN_PROJECT_TECHNOLOGIES = 2
+"""A project presented as using one technology reads as unfinished."""
+
+MAX_PROJECT_TECHNOLOGIES = 10
+"""Beyond this the list stops being read and starts looking padded."""
 
 MIN_BULLET_CHARACTERS = 40
 """Below this a bullet cannot carry implementation, detail, and impact."""
@@ -121,6 +134,78 @@ class ExperienceBullets(BaseModel):
                 f"got {len(self.bullets)}"
             )
         return self
+
+
+def _normalize_subtitle(value: str) -> str:
+    """Hold the subtitle to something that fits on the title line."""
+    collapsed = " ".join(value.split())
+    if len(collapsed) < MIN_SUBTITLE_CHARACTERS:
+        raise ValueError(
+            f"must be at least {MIN_SUBTITLE_CHARACTERS} characters, got {len(collapsed)}"
+        )
+    if len(collapsed) > MAX_SUBTITLE_CHARACTERS:
+        raise ValueError(
+            f"must be at most {MAX_SUBTITLE_CHARACTERS} characters, got {len(collapsed)}"
+        )
+    return collapsed
+
+
+SubtitleText = Annotated[str, AfterValidator(_normalize_subtitle)]
+"""A project subtitle, short enough to sit beside the project name on one line."""
+
+
+def _check_technologies(values: tuple[str, ...]) -> tuple[str, ...]:
+    """Require a credible, readable technology list."""
+    cleaned = clean_items(values)
+    if len(cleaned) < MIN_PROJECT_TECHNOLOGIES:
+        raise ValueError(
+            f"must name at least {MIN_PROJECT_TECHNOLOGIES} technologies, got {len(cleaned)}"
+        )
+    if len(cleaned) > MAX_PROJECT_TECHNOLOGIES:
+        raise ValueError(
+            f"must name at most {MAX_PROJECT_TECHNOLOGIES} technologies, got {len(cleaned)}"
+        )
+    return cleaned
+
+
+ProjectTechnologies = Annotated[tuple[str, ...], AfterValidator(_check_technologies)]
+"""The stack a project is presented as being built on."""
+
+
+class ProjectContent(BaseModel):
+    """The rewritten presentation of one project.
+
+    The project name is not here: it is the anchor that lets a researcher line the
+    generated project up against its source. Everything about what the project
+    appears to *be* — its subtitle, its stack, its bullets — is generated.
+    """
+
+    model_config = GENERATED_MODEL_CONFIG
+
+    subtitle: SubtitleText
+    technologies: ProjectTechnologies
+    bullets: Annotated[tuple[BulletText, ...], AfterValidator(_reject_repeated_bullets)]
+
+    @model_validator(mode="after")
+    def _check_bullet_count(self) -> ProjectContent:
+        if len(self.bullets) != REQUIRED_PROJECT_BULLET_COUNT:
+            raise ValueError(
+                f"must contain exactly {REQUIRED_PROJECT_BULLET_COUNT} bullets, "
+                f"got {len(self.bullets)}"
+            )
+        return self
+
+
+class GeneratedProject(BaseModel):
+    """One project as it appears on the generated resume."""
+
+    model_config = GENERATED_MODEL_CONFIG
+
+    name: str
+    subtitle: str
+    date: str | None
+    technologies: tuple[str, ...]
+    bullets: tuple[str, ...]
 
 
 class GeneratedExperience(BaseModel):

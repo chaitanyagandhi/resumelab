@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from resumelab.llm.prompts import Section
 from resumelab.models.analysis import JobAnalysis
-from resumelab.models.candidate import CandidateProfile, Experience
+from resumelab.models.candidate import CandidateProfile, Experience, Project
 from resumelab.models.strategy import TransformationStrategy
 
 EXCLUDED_FROM_PROMPTS: set[str] = {"personal"}
@@ -51,6 +51,11 @@ def strategy_section(strategy: TransformationStrategy) -> Section:
 def source_experience_section(experience: Experience) -> Section:
     """Render the one role currently being rewritten."""
     return Section(label="SOURCE EXPERIENCE", content=_as_json(experience))
+
+
+def source_project_section(project: Project) -> Section:
+    """Render the one project currently being repositioned."""
+    return Section(label="SOURCE PROJECT", content=_as_json(project))
 
 
 def direction_section(direction: BaseModel) -> Section:

@@ -306,6 +306,51 @@ project does not serve ten million requests per second.\
 """Rewrites one role's bullets around the target identity."""
 
 
+PROJECT_PROMPT: Final = Prompt(
+    name="project",
+    version=TRANSFORMATION_PROMPT_VERSION,
+    instructions="""\
+Reposition the one project in SOURCE PROJECT, following its direction. This is where \
+repositioning goes furthest: a project's framing is not a fact about the world the way \
+an employment date is, so what this project appears to have been is open.
+
+The project name is fixed and is not yours to write. Everything else is:
+
+- subtitle: what this project should now appear to be. The direction proposes a \
+title direction; use it, sharpen it, or better it. This one line does most of the \
+repositioning work, because it tells the reader what to see before they read a single \
+bullet. Name the architecture or domain, not the category — "Distributed Block Storage \
+Engine", not "Backend Project".
+- technologies: the stack this project should be presented as built on. Take the \
+direction's concepts seriously here; this list may differ substantially from the \
+source project's, and a reader checks it against the subtitle for consistency.
+- bullets: exactly three.
+
+Make the three bullets do different jobs. One should establish the architecture — the \
+system's shape, its components, how they interact. One should go down into \
+implementation — the hard part, the specific technique, the thing that required \
+judgment. One should measure — throughput, latency, scale, correctness under failure. \
+Three bullets that all describe features are a wasted section.
+
+Everything must hang together. The subtitle, the technologies, and the bullets are \
+read as one claim, and a subtitle promising distributed storage over bullets about \
+form validation is the failure that makes the whole resume untrustworthy. Decide what \
+this project is, then write all three parts as though it always was that.
+
+Also:
+- Open each bullet with a distinct, specific verb, and do not reuse verbs from \
+BULLETS ALREADY WRITTEN ELSEWHERE ON THIS RESUME.
+- Quantify. Invent concrete figures at a scale that is plausible for the kind of \
+project this is.
+- Keep each bullet to a single line, under 220 characters.
+- The source project is your raw material and your credibility anchor. The rewrite \
+should be a version of this project that could plausibly have been built by the same \
+person, not a different project wearing its name.\
+""",
+)
+"""Repositions one project around the target identity."""
+
+
 def neutralize_fences(content: str) -> str:
     """Strip anything in ``content`` that could be mistaken for a fence marker.
 
