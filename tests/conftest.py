@@ -9,6 +9,12 @@ from resumelab.llm.client import LLMCallStats, TokenUsage
 from resumelab.models.analysis import JobAnalysis
 from resumelab.models.candidate import CandidateProfile
 from resumelab.models.job import JobDescription, JobDescriptionSource
+from resumelab.models.resume import (
+    GeneratedExperience,
+    GeneratedProject,
+    GeneratedResume,
+    SkillGroup,
+)
 from resumelab.models.strategy import (
     ExperienceDirection,
     ProjectDirection,
@@ -16,6 +22,24 @@ from resumelab.models.strategy import (
 )
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
+
+EXPERIENCE_BULLETS = (
+    "Built a replication controller in Go that places volumes across 3,000 nodes, "
+    "cutting rebalance time from hours to under ten minutes.",
+    "Instrumented the NVMe write path with per-device latency histograms, surfacing "
+    "tail regressions before they reached customers.",
+    "Designed an erasure-coded storage tier on Linux that cut capacity overhead by "
+    "40% while holding p99 read latency flat.",
+)
+
+PROJECT_BULLETS = (
+    "Architected a shared-nothing ingestion path that fans writes across NVMe-oF "
+    "targets at 40k events per second per node.",
+    "Implemented an idempotent replay log with content-addressed segments, making "
+    "broker-failure recovery deterministic.",
+    "Measured durability under injected disk faults, holding p99 commit latency "
+    "under 12ms across 200 simulated failures.",
+)
 
 SETTINGS_ENV_VARS = (
     "LLM_PROVIDER",
@@ -93,6 +117,44 @@ class RecordingLLMClient:
     @property
     def last_call(self) -> RecordedCall:
         return self.calls[-1]
+
+
+@pytest.fixture
+def generated_resume(candidate_profile):
+    """A complete, valid resume, as the assembler would produce it."""
+    return GeneratedResume(
+        personal=candidate_profile.personal,
+        summary=(
+            "Storage infrastructure engineer who builds distributed data-path services "
+            "in Go and Java on Linux, close to NVMe devices and network protocols."
+        ),
+        education=candidate_profile.education,
+        experiences=(
+            GeneratedExperience(
+                company="Analytical Engines Inc.",
+                title="Software Engineer Intern",
+                location="Remote",
+                start_date="May 2025",
+                end_date="Aug 2025",
+                bullets=EXPERIENCE_BULLETS,
+            ),
+        ),
+        projects=tuple(
+            GeneratedProject(
+                name=f"Project {index}",
+                subtitle=f"Distributed Storage Engine {index}",
+                date="2025",
+                technologies=("Go", "Linux", "NVMe-oF"),
+                bullets=tuple(f"{bullet} Variant {index}." for bullet in PROJECT_BULLETS),
+            )
+            for index in range(1, 4)
+        ),
+        skills=(
+            SkillGroup(label="Languages", skills=("Go", "Java", "Python")),
+            SkillGroup(label="Storage & Systems", skills=("Linux", "NVMe-oF", "NFS")),
+        ),
+        achievements=candidate_profile.achievements,
+    )
 
 
 @pytest.fixture

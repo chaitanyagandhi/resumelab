@@ -13,7 +13,11 @@ from typing import Annotated
 
 from pydantic import AfterValidator, BaseModel, model_validator
 
-from resumelab.models.candidate import REQUIRED_PROJECT_BULLET_COUNT
+from resumelab.models.candidate import (
+    REQUIRED_PROJECT_BULLET_COUNT,
+    Education,
+    PersonalDetails,
+)
 from resumelab.models.common import GENERATED_MODEL_CONFIG, clean_items, require_content
 
 REQUIRED_EXPERIENCE_BULLET_COUNT = 3
@@ -299,3 +303,31 @@ class GeneratedExperience(BaseModel):
     start_date: str | None
     end_date: str | None
     bullets: tuple[str, ...]
+
+
+class GeneratedResume(BaseModel):
+    """The complete resume, ready to render.
+
+    Deliberately permissive. Its parts were validated as they were generated, but the
+    checks that matter before rendering are run by
+    :mod:`resumelab.validation.resume_validator`, which reports every problem at once
+    instead of failing on the first. Duplicating them here would make an invalid
+    resume unconstructible and the validator untestable.
+    """
+
+    model_config = GENERATED_MODEL_CONFIG
+
+    personal: PersonalDetails
+    summary: str
+    education: tuple[Education, ...]
+    experiences: tuple[GeneratedExperience, ...]
+    projects: tuple[GeneratedProject, ...]
+    skills: tuple[SkillGroup, ...]
+    achievements: tuple[str, ...] = ()
+
+    @property
+    def all_bullets(self) -> tuple[str, ...]:
+        """Every bullet on the resume, for whole-document checks."""
+        from_experiences = [b for experience in self.experiences for b in experience.bullets]
+        from_projects = [b for project in self.projects for b in project.bullets]
+        return tuple(from_experiences + from_projects)

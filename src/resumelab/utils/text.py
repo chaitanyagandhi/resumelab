@@ -12,6 +12,17 @@ import unicodedata
 _PRESERVED_CONTROL_CHARACTERS = frozenset("\n\t")
 
 
+def control_characters(value: str) -> list[str]:
+    """Return the control characters in ``value``, as escaped literals.
+
+    Nothing on a finished resume should contain one. They survive copy-paste, break
+    text extraction from the rendered PDF, and are invisible while doing it.
+    """
+    return sorted(
+        {repr(character) for character in value if unicodedata.category(character) == "Cc"}
+    )
+
+
 def normalize_text(value: str) -> str:
     """Return ``value`` as clean, consistently encoded text.
 
