@@ -67,6 +67,7 @@ def build_metadata(
         candidate_profile_hash=sha256_of_file(settings.candidate_profile_path),
         job_description_source=job_description.source.value,
         job_description_characters=job_description.character_count,
+        job_description_url=job_description.source_url,
         layout_scale=layout_scale,
         page_count=page_count,
         condensed=condensed,

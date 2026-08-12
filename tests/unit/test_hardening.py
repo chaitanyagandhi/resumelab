@@ -226,3 +226,15 @@ def test_a_job_description_over_the_ceiling_is_rejected():
 def test_a_posting_that_is_only_hidden_characters_is_rejected():
     with pytest.raises(ResumeLabError, match="empty"):
         load_job_description(text="​​​   ﻿")
+
+
+def test_an_over_long_label_is_cut_back_to_a_word_boundary():
+    """Run directories get read, so a name should not end mid-word."""
+    slug = slugify("Northlake Systems Software Engineer, Cloud Storage Infrastructure")
+
+    assert slug == "northlake-systems-software-engineer"
+
+
+def test_a_single_over_long_word_is_cut_where_it_must_be():
+    """With no late word boundary, a ragged edge beats throwing the name away."""
+    assert slugify("x" * 200) == "x" * 40

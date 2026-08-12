@@ -78,6 +78,9 @@ resumelab generate --jd examples/sample_jd.txt --output output/crusoe_resume.pdf
 # Supply the posting directly
 resumelab generate --jd-text "Senior Go engineer, distributed storage..."
 
+# Or paste the link to a posting and let ResumeLab read it
+resumelab generate --jd-url https://job-boards.greenhouse.io/acme/jobs/8077887
+
 # Force a provider for one run
 resumelab generate --jd examples/sample_jd.txt --provider anthropic
 ```
@@ -91,11 +94,14 @@ make generate JD=examples/sample_jd.txt
 
 | Flag | Applies to | Meaning |
 |---|---|---|
-| `--jd PATH` | both | Job description file. Mutually exclusive with `--jd-text`. |
+| `--jd PATH` | both | Job description file. |
 | `--jd-text TEXT` | both | Job description supplied directly. |
+| `--jd-url URL` | both | Link to a posting, fetched and reduced to text. |
 | `--provider` | both | `openai` or `anthropic`, overriding configuration. |
 | `--output`, `-o` | both | `analyze`: write the analysis as JSON. `generate`: also write the PDF here. |
 | `--debug` | both | Log at DEBUG and show tracebacks instead of one-line errors. |
+
+Exactly one of `--jd`, `--jd-text`, and `--jd-url` may be given.
 
 `analyze` exists because the analysis conditions everything downstream. When a generated
 resume disappoints, reading the analysis is how you tell a bad *reading of the posting*
@@ -106,12 +112,43 @@ use. Scripts and batch runs use the configured provider without prompting.
 
 ---
 
+## Reading a posting from a URL
+
+`--jd-url` turns a link into the same text you would otherwise have pasted. Where the
+applicant tracking system publishes the posting as structured data, that is read
+instead of the rendered page — the text arrives already free of navigation and
+boilerplate, and the title, company, and location are fields rather than guesses.
+
+| Source | How it is read |
+|---|---|
+| Greenhouse | Board API. Its `content` field is entity-escaped twice; that is undone. |
+| Lever | Postings API, reassembled from the four fields it splits a posting across. |
+| Ashby | Job-board API, filtered to the posting the URL names. |
+| Workday | The `/wday/cxs/` JSON behind the page, which is otherwise JavaScript-rendered. |
+| Anything else | A schema.org `JobPosting` block if the page has one, else its `<main>` text. |
+
+The fetched posting is written to the run's `jd.txt`, so what was analyzed is always
+recoverable — including when a fallback read carried a cookie banner along with it.
+
+**What does not work.** Sites behind bot protection (Indeed, among others) refuse
+automated requests and are reported as doing so. The user agent identifies ResumeLab
+rather than imitating a browser, and working around bot detection is out of scope; use
+`--jd-text` or `--jd` for those. A page whose posting is rendered entirely by
+JavaScript and carries no structured block is reported as such rather than analyzed as
+if the empty shell were a posting.
+
+A fetched posting is untrusted in exactly the way a pasted one is: it is fenced as data
+in every prompt, and scanned for instruction-like content, which is logged.
+
+---
+
 ## Architecture
 
 ```
 data/candidate_profile.yaml ─┐
                              ├─► JD analysis ─► transformation strategy ─┐
 job description ─────────────┘                                           │
+  (file, text, or URL)                                                   │
                                                                          ▼
                             summary ─ experience ─ projects ─ skills (per-section rewrite)
                                                                          │
@@ -123,6 +160,7 @@ job description ─────────────┘                      
 |---|---|
 | `models/` | Pydantic domain models: source profile, job description, analysis, strategy, generated resume, run metadata |
 | `loaders/` | Reading and validating the profile and the posting |
+| `fetching/` | Retrieving a posting from a URL: board adapters, then the page itself |
 | `llm/` | Provider abstraction, OpenAI and Anthropic adapters, retry policy, versioned prompts |
 | `pipeline/` | One module per stage, plus the generator that orders them |
 | `validation/` | Deterministic pre-render checks over the finished resume |
@@ -238,8 +276,8 @@ Intermediates are written as they are produced, so a run that fails at any stage
 leaves behind the reasoning that led there.
 
 `metadata.json` records the provider, model, temperature or effort, both prompt versions,
-the **SHA-256 of the source profile**, the job description's provenance, call count, token
-usage, duration, and the layout outcome. The profile hash is what lets two runs be shown
+the **SHA-256 of the source profile**, the job description's provenance — including the
+URL, when it was fetched — call count, token usage, duration, and the layout outcome. The profile hash is what lets two runs be shown
 to have shared an input.
 
 Prompts are versioned in two families — `JD_ANALYSIS_PROMPT_VERSION` and
@@ -283,6 +321,8 @@ reading order, with every bullet intact.
 - **One page is a target, not a guarantee.** The renderer tightens the layout within
   conservative limits and will condense once; content that still overflows is written as a
   readable two pages rather than shrunk into an unreadable one.
+- **Posting retrieval does not defeat bot protection.** Sites that refuse automated
+  requests are reported as refusing them; paste the posting instead.
 - **Injection detection is a signal, not a defence.** The defence is the fencing and the
   system prompt; the detector only makes a suspicious posting visible in the log.
 - **Model behavior is not reproducible across providers or model versions**, even at a

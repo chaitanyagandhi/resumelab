@@ -150,7 +150,7 @@ def test_supplying_both_inputs_is_rejected(jd_file, fake_llm):
     result = invoke("analyze", "--jd", str(jd_file), "--jd-text", "Some posting text here.")
 
     assert result.exit_code == 1
-    assert "not both" in result.stderr
+    assert "mutually exclusive" in result.stderr
 
 
 def test_supplying_neither_input_is_rejected(fake_llm):
@@ -383,3 +383,57 @@ def test_a_write_that_fails_after_validation_is_still_reported(
 
     assert result.exit_code == 1
     assert "Could not write the analysis" in result.stderr
+
+
+# --- postings fetched from a URL ------------------------------------------
+
+POSTING_URL = "https://job-boards.greenhouse.io/northlake/jobs/8077887"
+
+
+@pytest.fixture
+def fake_fetch(monkeypatch):
+    """Replace posting retrieval, so no CLI test reaches the network."""
+    from resumelab.fetching.models import FetchedPosting, PostingBoard
+
+    posting = FetchedPosting(
+        text=(
+            "Storage Infrastructure Engineer. Build distributed storage services in Go "
+            "and Java on Linux, working with NVMe devices and network storage protocols."
+        ),
+        board=PostingBoard.GREENHOUSE,
+        requested_url=POSTING_URL,
+        final_url=POSTING_URL,
+        title="Storage Infrastructure Engineer",
+        company="Northlake Systems",
+    )
+    monkeypatch.setattr("resumelab.loaders.jd_loader.fetch_posting", lambda *_a, **_k: posting)
+    return posting
+
+
+def test_a_posting_url_is_analyzed(fake_fetch, fake_llm):
+    result = invoke("analyze", "--jd-url", POSTING_URL)
+
+    assert result.exit_code == 0
+    assert len(fake_llm.calls) == 1
+
+
+def test_a_file_and_a_url_together_are_rejected(jd_file, fake_llm):
+    result = invoke("analyze", "--jd", str(jd_file), "--jd-url", POSTING_URL)
+
+    assert result.exit_code == 1
+    assert "mutually exclusive" in result.stderr
+
+
+def test_a_failed_fetch_is_reported_as_one_line(monkeypatch, fake_llm):
+    from resumelab.exceptions import JDFetchError
+
+    def refuse(*_args, **_kwargs):
+        raise JDFetchError("The site refused an automated request (HTTP 403).")
+
+    monkeypatch.setattr("resumelab.loaders.jd_loader.fetch_posting", refuse)
+
+    result = invoke("analyze", "--jd-url", POSTING_URL)
+
+    assert result.exit_code == 1
+    assert "HTTP 403" in result.stderr
+    assert "Traceback" not in result.stderr

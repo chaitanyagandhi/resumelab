@@ -272,3 +272,98 @@ def test_a_real_provider_produces_a_resume(storage_jd, tmp_path, profile_path):
 
     assert outcome.render.path.read_bytes().startswith(b"%PDF-")
     assert outcome.metadata.llm_calls >= 8
+
+
+# --- a run driven from a posting URL --------------------------------------
+
+POSTING_URL = "https://job-boards.greenhouse.io/northlake/jobs/8077887"
+POSTING_API = "https://boards-api.greenhouse.io/v1/boards/northlake/jobs/8077887"
+
+
+@pytest.fixture
+def fetched_jd(storage_jd):
+    """A posting loaded over HTTP instead of from disk, with the same text.
+
+    Same words as `storage_jd`, so any difference in the run is attributable to the
+    source rather than to the content.
+    """
+    import httpx
+
+    payload = {
+        "title": "Software Engineer, Cloud Storage Infrastructure",
+        "company_name": "Northlake Systems",
+        "location": {"name": "Sunnyvale, CA"},
+        "content": storage_jd.read_text(encoding="utf-8"),
+    }
+
+    def handler(request):
+        assert str(request.url) == POSTING_API
+        return httpx.Response(
+            200, text=json.dumps(payload), headers={"content-type": "application/json"}
+        )
+
+    return load_job_description(
+        url=POSTING_URL,
+        http_client=httpx.Client(transport=httpx.MockTransport(handler)),
+    )
+
+
+@pytest.fixture
+def fetched_result(fetched_jd, settings, fake_llm):
+    return generate_resume(
+        fetched_jd, settings=settings, provider=LLMProvider.OPENAI, client=fake_llm
+    )
+
+
+def test_a_run_from_a_url_produces_a_complete_resume(fetched_result):
+    """A fetched posting drives the pipeline exactly as a pasted one does."""
+    assert fetched_result.resume.summary
+    assert fetched_result.render.path.exists()
+    assert len(fetched_result.resume.projects) == 3
+
+
+def test_a_run_from_a_url_is_named_after_the_posting(fetched_result):
+    """Comparing runs across postings is done by reading directory names."""
+    assert fetched_result.run.run_id.endswith("_northlake-systems-software-engineer")
+
+
+def test_a_run_from_a_url_records_where_it_came_from(fetched_result):
+    metadata = RunMetadata.model_validate_json(
+        (fetched_result.run.directory / METADATA_FILE).read_text(encoding="utf-8")
+    )
+
+    assert metadata.job_description_source == "url"
+    assert metadata.job_description_url == POSTING_URL
+
+
+def test_a_run_from_a_file_records_no_url(result):
+    """The field is provenance, not decoration: it is absent when nothing was fetched."""
+    assert result.metadata.job_description_source == "file"
+    assert result.metadata.job_description_url is None
+
+
+def test_the_fetched_posting_is_recorded_as_analyzed(fetched_result):
+    recorded = (fetched_result.run.directory / "jd.txt").read_text(encoding="utf-8")
+
+    assert "NVMe-oF" in recorded
+    assert "&lt;" not in recorded
+
+
+def test_a_url_run_built_directly_is_named_after_its_host(storage_jd, settings, fake_llm):
+    """The pipeline is callable without the CLI, and then nothing supplies a label.
+
+    A run still needs a findable name, so it falls back to the site it came from.
+    """
+    from resumelab.models.job import JobDescription, JobDescriptionSource
+
+    unlabelled = JobDescription(
+        text=storage_jd.read_text(encoding="utf-8"),
+        source=JobDescriptionSource.URL,
+        source_url=POSTING_URL,
+    )
+
+    outcome = generate_resume(
+        unlabelled, settings=settings, provider=LLMProvider.OPENAI, client=fake_llm
+    )
+
+    assert outcome.run.run_id.endswith("_job-boards-greenhouse-io")

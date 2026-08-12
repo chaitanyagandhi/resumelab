@@ -54,6 +54,14 @@ JdTextOption = Annotated[
     str | None,
     typer.Option("--jd-text", help="Job description supplied directly.", show_default=False),
 ]
+JdUrlOption = Annotated[
+    str | None,
+    typer.Option(
+        "--jd-url",
+        help="Link to a job posting, fetched and reduced to text.",
+        show_default=False,
+    ),
+]
 ProviderOption = Annotated[
     LLMProvider | None,
     typer.Option("--provider", help="Override the configured LLM provider."),
@@ -87,6 +95,7 @@ def version() -> None:
 def analyze(
     jd: JdOption = None,
     jd_text: JdTextOption = None,
+    jd_url: JdUrlOption = None,
     provider: ProviderOption = None,
     output: OutputOption = None,
     debug: DebugOption = False,
@@ -101,7 +110,7 @@ def analyze(
     configure_logging(settings.log_level, debug=debug)
 
     with _reported_failures(debug):
-        job_description = load_job_description(path=jd, text=jd_text)
+        job_description = load_job_description(path=jd, text=jd_text, url=jd_url)
         client = create_llm_client(settings, provider=provider)
         analysis = analyze_job_description(job_description, client=client)
 
@@ -208,6 +217,7 @@ def _wrapped(text: str, *, width: int = 78) -> str:
 def generate(
     jd: JdOption = None,
     jd_text: JdTextOption = None,
+    jd_url: JdUrlOption = None,
     provider: ProviderOption = None,
     output: PdfOutputOption = None,
     debug: DebugOption = False,
@@ -226,7 +236,7 @@ def generate(
     configure_logging(settings.log_level, debug=debug)
 
     with _reported_failures(debug):
-        job_description = load_job_description(path=jd, text=jd_text)
+        job_description = load_job_description(path=jd, text=jd_text, url=jd_url)
         chosen = _choose_provider(settings, provider)
         client = create_llm_client(settings, provider=chosen)
         result = generate_resume(

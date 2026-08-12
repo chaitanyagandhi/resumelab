@@ -56,6 +56,8 @@ class RunMetadata(BaseModel):
 
     job_description_source: str
     job_description_characters: int
+    job_description_url: str | None = None
+    """The posting's address when it was fetched, so a run can be traced to its source."""
 
     # --- how it turned out --------------------------------------------------
     layout_scale: float | None = None

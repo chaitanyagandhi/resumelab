@@ -92,7 +92,7 @@ def test_a_file_source_requires_a_path():
 
 
 def test_an_inline_source_must_not_carry_a_path():
-    with pytest.raises(ValidationError, match="source_path must be omitted"):
+    with pytest.raises(ValidationError, match="must be omitted when the source is inline text"):
         make_jd(source=JobDescriptionSource.TEXT, source_path=Path("jd.txt"))
 
 
@@ -117,3 +117,45 @@ def test_character_count_reflects_the_normalized_text():
     jd = make_jd(f"  {JD_TEXT}  ")
 
     assert jd.character_count == len(JD_TEXT)
+
+
+# --- provenance for fetched postings ---------------------------------------
+
+POSTING_URL = "https://job-boards.greenhouse.io/northlake/jobs/8077887"
+
+
+def test_a_url_source_carries_its_url():
+    jd = JobDescription(text=JD_TEXT, source=JobDescriptionSource.URL, source_url=POSTING_URL)
+
+    assert jd.source_url == POSTING_URL
+    assert jd.source_path is None
+
+
+def test_a_url_source_requires_a_url():
+    with pytest.raises(ValidationError, match="source_url is required"):
+        JobDescription(text=JD_TEXT, source=JobDescriptionSource.URL)
+
+
+def test_a_url_source_must_not_carry_a_path():
+    with pytest.raises(ValidationError, match="source_path must be omitted"):
+        JobDescription(
+            text=JD_TEXT,
+            source=JobDescriptionSource.URL,
+            source_url=POSTING_URL,
+            source_path=Path("jd.txt"),
+        )
+
+
+def test_a_file_source_must_not_carry_a_url():
+    with pytest.raises(ValidationError, match="source_url must be omitted"):
+        JobDescription(
+            text=JD_TEXT,
+            source=JobDescriptionSource.FILE,
+            source_path=Path("jd.txt"),
+            source_url=POSTING_URL,
+        )
+
+
+def test_an_inline_source_must_not_carry_a_url():
+    with pytest.raises(ValidationError, match="must be omitted when the source is inline text"):
+        JobDescription(text=JD_TEXT, source=JobDescriptionSource.TEXT, source_url=POSTING_URL)

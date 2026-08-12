@@ -36,10 +36,30 @@ def slugify(value: str, *, max_length: int = MAX_SLUG_LENGTH) -> str:
     Everything outside ``a-z0-9`` becomes a hyphen, so a label taken from user input
     cannot introduce a path separator, a parent reference, or a hidden file. A label
     that reduces to nothing falls back to :data:`FALLBACK_SLUG`.
+
+    An over-long label is cut back to a word boundary where one is close enough to
+    the limit, because these name run directories and directories get read: a run
+    named after a fetched posting should end at ``…-software-engineer`` rather than
+    at ``…-software-engineer-clou``.
     """
     normalized = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
-    slug = _NON_SLUG.sub("-", normalized.lower()).strip("-")[:max_length].strip("-")
+    slug = _NON_SLUG.sub("-", normalized.lower()).strip("-")
+    if len(slug) > max_length:
+        slug = _trim_to_word(slug, max_length)
     return slug or FALLBACK_SLUG
+
+
+def _trim_to_word(slug: str, max_length: int) -> str:
+    """Shorten ``slug``, preferring the last word boundary in the second half.
+
+    A boundary in the first half would throw away more of the name than the ragged
+    edge costs, so a label with no late boundary — one very long word — is simply cut.
+    """
+    clipped = slug[:max_length].strip("-")
+    boundary = clipped.rfind("-")
+    if boundary >= max_length // 2:
+        return clipped[:boundary]
+    return clipped
 
 
 def control_characters(value: str) -> list[str]:

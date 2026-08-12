@@ -15,6 +15,7 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass
 from pathlib import Path
+from urllib.parse import urlsplit
 
 from resumelab.config import LLMProvider, Settings
 from resumelab.experiment import ExperimentRun, build_metadata, create_run
@@ -155,10 +156,22 @@ def _render_to_fit(
 
 
 def _run_label(job_description: JobDescription) -> str:
-    """Name the run after where the posting came from, so directories are findable."""
+    """Name the run after where the posting came from, so directories are findable.
+
+    A fetched posting usually knows its company and title, which makes a far more
+    findable directory than its URL would — comparing runs across postings is the
+    whole workflow, and that is done by reading directory names.
+    """
     if job_description.source is JobDescriptionSource.FILE and job_description.source_path:
         return job_description.source_path.stem
+    if job_description.source is JobDescriptionSource.URL:
+        return job_description.source_label or _host_of(job_description.source_url)
     return "inline"
+
+
+def _host_of(url: str | None) -> str:
+    """Fall back to the site's name when a posting named neither company nor role."""
+    return urlsplit(url or "").hostname or "posting"
 
 
 def copy_pdf(rendered: RenderResult, destination: Path) -> Path:

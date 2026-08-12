@@ -51,6 +51,7 @@ class JobDescriptionSource(StrEnum):
 
     FILE = "file"
     TEXT = "text"
+    URL = "url"
 
 
 class JobDescription(BaseModel):
@@ -58,6 +59,11 @@ class JobDescription(BaseModel):
 
     Frozen, so the exact text analyzed is the text persisted into the run's
     artifacts.
+
+    A posting fetched from a URL is deliberately indistinguishable downstream from
+    one that was pasted: it is the same normalized, bounded, untrusted text. Only the
+    provenance fields differ, and they exist so a run can be traced back to what it
+    read — never to change how it is read.
     """
 
     model_config = ConfigDict(frozen=True)
@@ -65,14 +71,38 @@ class JobDescription(BaseModel):
     text: JobDescriptionText
     source: JobDescriptionSource
     source_path: Path | None = None
+    source_url: str | None = None
+    """The posting's address, when it was fetched. Recorded in the run metadata."""
+
+    source_label: str | None = None
+    """A human-meaningful name for the posting, when the source supplied one.
+
+    Names the run directory, so a fetched posting produces
+    ``…_northlake-systems-storage-engineer`` rather than a slugified URL.
+    """
 
     @model_validator(mode="after")
-    def _check_source_path_matches_source(self) -> JobDescription:
-        """Keep the provenance record honest."""
-        if self.source is JobDescriptionSource.FILE and self.source_path is None:
-            raise ValueError("source_path is required when the source is a file")
-        if self.source is JobDescriptionSource.TEXT and self.source_path is not None:
-            raise ValueError("source_path must be omitted when the source is inline text")
+    def _check_provenance_matches_source(self) -> JobDescription:
+        """Keep the provenance record honest.
+
+        Each source carries exactly the locator that source has, and no other. A
+        record claiming to be inline text while holding a path would misreport where
+        a published result came from.
+        """
+        if self.source is JobDescriptionSource.FILE:
+            if self.source_path is None:
+                raise ValueError("source_path is required when the source is a file")
+            if self.source_url is not None:
+                raise ValueError("source_url must be omitted when the source is a file")
+        elif self.source is JobDescriptionSource.URL:
+            if self.source_url is None:
+                raise ValueError("source_url is required when the source is a url")
+            if self.source_path is not None:
+                raise ValueError("source_path must be omitted when the source is a url")
+        elif self.source_path is not None or self.source_url is not None:
+            raise ValueError(
+                "source_path and source_url must be omitted when the source is inline text"
+            )
         return self
 
     @property
