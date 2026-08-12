@@ -204,8 +204,9 @@ def test_the_prompt_states_the_selection_rule(
 
     assert "Between 10 and 20 skills" in system_prompt
     assert "No categories" in system_prompt
-    assert "closely related" in system_prompt
-    assert "Do not pad the list" in system_prompt
+    assert "The job description decides what belongs here" in system_prompt
+    assert "Only if the posting names fewer than 10" in system_prompt
+    assert "raw material, not a checklist" in system_prompt
     assert "Select and order; do not transcribe." in system_prompt
 
 

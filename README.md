@@ -172,6 +172,10 @@ Three structural rules hold throughout:
 - **The model never produces the document.** It returns structured content; the renderer
   owns every layout decision. Any visual difference between two runs is a content
   difference.
+- **Every glyph on the page is checked to extract as itself.** Text is Helvetica, which
+  needs no embedding; the bullet and the field separator are drawn from one embedded
+  font, because in the standard PDF fonts the round bullet extracts as U+007F — a
+  control character every resume parser would see.
 - **Stages depend on an `LLMClient` protocol**, never a provider client, so a stage can be
   tested against a fake and a second provider is a new file rather than an edit.
 - **Personal details never reach a model.** Name, email, phone, and profile links are
@@ -313,8 +317,9 @@ reading order, with every bullet intact.
   keyword-coverage, and unsupported-claim measurement, but none of that is implemented.
 - **No batch mode.** One posting per invocation.
 - **The skills section is a fixed-size selection.** Between 10 and 20 skills, drawn from
-  what the posting asks for and then from profile skills adjacent to it. The cap is
-  deliberate: it forces the model to choose, which is what makes the choice measurable.
+  what the posting asks for, and only from profile skills adjacent to it when the
+  posting names fewer than ten. The cap is deliberate: it forces the model to choose,
+  which is what makes the choice measurable.
 - **Bullet counts are coupled.** `EXPERIENCE_BULLET_COUNT` and `PROJECT_BULLET_COUNT` are
   validated deterministically *and* enforced by the response schemas. Changing the
   environment variable alone fails the run loudly rather than being ignored; change the

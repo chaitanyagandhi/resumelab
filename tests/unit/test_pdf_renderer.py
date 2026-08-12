@@ -233,14 +233,22 @@ def test_skills_render_as_one_separated_line(extracted, generated_resume):
     """Flat, not grouped: no labels, and the document's own separator between terms."""
     first, second = generated_resume.skills[:2]
 
-    assert f"{first} \u00b7 {second}" in extracted
+    assert f"{first} \u2022 {second}" in extracted
 
 
 def test_the_skill_separator_extracts_as_itself(extracted):
-    """The bullet glyph trap: a separator that renders but extracts as a control
-    character would be invisible here and wrong in every ATS."""
-    assert "\u00b7" in extracted
+    """A separator that renders but extracts as a control character would be
+    invisible here and wrong in every ATS."""
+    assert "\u2022" in extracted
     assert "\x7f" not in extracted
+
+
+def test_no_control_characters_survive_anywhere_in_the_document(extracted):
+    """The whole point of the embedded glyph font: U+2022 in a base-14 font extracts
+    as U+007F, which every parser reading this resume would see."""
+    assert not [
+        character for character in extracted if ord(character) < 32 or ord(character) == 127
+    ]
 
 
 def test_achievements_are_rendered_when_present(extracted, generated_resume):

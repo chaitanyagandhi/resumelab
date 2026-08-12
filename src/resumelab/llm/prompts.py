@@ -367,15 +367,20 @@ naming one thing costs naming another, so the list has to be a choice. A section
 lists everything the candidate has ever touched tells a reader nothing about which \
 engineer is being presented.
 
-Where the skills come from, in order of preference:
-1. The skills this job description actually asks for — its languages, frameworks, \
-infrastructure, databases, and the named tools in its requirements.
-2. If the posting names fewer than you need, skills from the candidate's profile that \
-are closely related to what the posting asks for: the same stack, the same layer of \
-the system, the adjacent tool a person doing this job would be expected to know.
+The job description decides what belongs here. Work in this order:
+1. Take the skills the posting itself names — its languages, frameworks, \
+infrastructure, databases, and the tools named in its requirements and its bonus \
+requirements. These come first and they fill most of the list. If the posting names \
+20 or more, the section is those 20 and you are done.
+2. Only if the posting names fewer than 10, make up the difference with skills that a \
+person doing this job would be expected to have: the same stack, the same layer of \
+the system, the adjacent tool. The candidate's existing profile is one source for \
+these, and it ranks below anything the posting asked for.
 
-Do not pad the list with whatever remains in the profile. A skill that is neither \
-asked for nor adjacent to what is asked for is taking a slot from one that is.
+The profile's skill list is raw material, not a checklist. A skill that is in the \
+profile but neither named by the posting nor adjacent to it does not go in, however \
+much of the profile that leaves out. It would be taking a slot from a skill this \
+employer is actually scanning for, and that trade is never worth making.
 
 Do not mirror the posting term for term either. A skills section that reproduces the \
 job description's keyword list in its own order is the most recognizable signature of \

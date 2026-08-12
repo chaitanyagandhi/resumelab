@@ -11,11 +11,16 @@ expressed relative to the body size rather than as independent magic numbers.
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import reportlab
 from reportlab.lib.colors import HexColor
 from reportlab.lib.enums import TA_CENTER, TA_LEFT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
+from reportlab.pdfbase import pdfmetrics
+from reportlab.pdfbase.ttfonts import TTFont
 
 # --- page -------------------------------------------------------------------
 PAGE_SIZE = LETTER
@@ -30,6 +35,33 @@ FONT_REGULAR = "Helvetica"
 FONT_BOLD = "Helvetica-Bold"
 FONT_ITALIC = "Helvetica-Oblique"
 """The standard PDF fonts: no embedding, and universally extractable."""
+
+GLYPH_FONT = "ResumeLabGlyph"
+"""Font used for the bullet and the field separator, and for nothing else.
+
+The body text stays in the base-14 Helvetica, which every PDF reader has and no
+document has to carry. But Helvetica's dots are square, and its built-in encoding
+mangles the round bullet on extraction. Registering one embedded font and tagging
+just those two glyphs into it buys a round bullet that extracts as U+2022, without
+embedding a typeface for the whole document.
+
+Bitstream Vera Sans ships inside ReportLab under a permissive license, so this adds
+no dependency and no file that has to be found at run time.
+"""
+
+_GLYPH_FONT_FILE = Path(reportlab.__file__).parent / "fonts" / "Vera.ttf"
+
+
+def register_fonts() -> None:
+    """Make :data:`GLYPH_FONT` available to the renderer.
+
+    Idempotent: rendering several resumes in one process registers once. ReportLab's
+    font registry is process-global, which is why this is a function rather than an
+    import-time side effect — a caller that never renders should not pay for it.
+    """
+    if GLYPH_FONT not in pdfmetrics.getRegisteredFontNames():
+        pdfmetrics.registerFont(TTFont(GLYPH_FONT, str(_GLYPH_FONT_FILE)))
+
 
 BODY_FONT_SIZE = 9.5
 NAME_FONT_SIZE = 19.0
@@ -74,26 +106,40 @@ RULE_THICKNESS = 0.6
 RULE_SPACE_BEFORE = 1.0
 RULE_SPACE_AFTER = 3.0
 
-BULLET_CHARACTER = "▪"
-"""A small square rather than a round bullet.
+BULLET_CHARACTER = "•"
+"""The conventional round bullet, drawn from :data:`GLYPH_FONT`.
 
-U+2022 is the conventional choice, but in the standard PDF fonts it extracts as
-U+007F — a control character. Every parser reading this resume would see it, and the
-validator rejects control characters in content for the same reason. This glyph
-renders as a bullet and extracts as itself.
+In the standard PDF fonts this character extracts as U+007F — a control character
+every parser reading this resume would see, and one the validator rejects in content.
+That is a property of the base-14 fonts' built-in encoding, not of the character: an
+embedded font carries a ToUnicode map, so the same glyph extracts as U+2022.
+
+Round rather than square is not only cosmetic. The square alternatives that survive
+the base-14 encoding (``▪``, ``∙``) are drawn from a different part of the
+repertoire, and several of them extract as U+25A0 regardless of what was asked for.
 """
-BULLET_FONT_SIZE = 5.5
-"""Drawn smaller than the body text, so the square reads as a bullet."""
 
-BULLET_OFFSET_Y = -1.6
-"""Lifts the smaller glyph off the baseline to sit optically centered."""
+BULLET_FONT_SIZE = 6.5
+"""Drawn below the body size, so the bullet marks the line without competing with it."""
+
+BULLET_OFFSET_Y = 0.0
+"""No lift needed: this glyph is already drawn at mid-height within its em.
+
+The square it replaced sat on the baseline and had to be raised. Keeping that
+correction here would push a round bullet up into the ascenders.
+"""
 
 BULLET_INDENT = 9.0
 BULLET_TEXT_INDENT = 18.0
 """Text hangs at this indent so wrapped bullet lines align under the first."""
 
-SEPARATOR = " · "
-"""Separates fields on one line. A single flow extracts far better than columns."""
+SEPARATOR = f' <font name="{GLYPH_FONT}">•</font> '
+"""Separates fields on one line. A single flow extracts far better than columns.
+
+The glyph is tagged into :data:`GLYPH_FONT` while the surrounding text stays
+Helvetica, because Helvetica draws its middle dot as a square. Only the separator
+changes font; the size is inherited, so it still scales with the layout.
+"""
 
 DATE_RANGE_SEPARATOR = " \u2013 "
 """En dash, the typographic convention for a span of dates."""
@@ -121,6 +167,7 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
         Styles keyed by role: ``name``, ``contact``, ``section``, ``entry``,
         ``detail``, ``body``, and ``bullet``.
     """
+    register_fonts()
     body = _scaled(BODY_FONT_SIZE, scale)
     detail = _scaled(DETAIL_FONT_SIZE, scale)
     entry = _scaled(ENTRY_FONT_SIZE, scale)
@@ -184,6 +231,7 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             leading=_leading(body),
             leftIndent=_scaled(BULLET_TEXT_INDENT, scale),
             bulletIndent=_scaled(BULLET_INDENT, scale),
+            bulletFontName=GLYPH_FONT,
             bulletFontSize=_scaled(BULLET_FONT_SIZE, scale),
             bulletOffsetY=_scaled(BULLET_OFFSET_Y, scale),
             spaceAfter=_scaled(SPACE_BETWEEN_BULLETS, scale),
