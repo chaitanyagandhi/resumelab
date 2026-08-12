@@ -189,7 +189,7 @@ Three structural rules hold throughout:
 | 4 | Generate summary | Executes the plan's `summary_direction` |
 | 5 | Transform experience | Rewrites bullets per role; anchors are never generated |
 | 6 | Transform projects | Regenerates subtitle, stack, and bullets; only the name is carried over |
-| 7 | Transform skills | Rebuilds the section, choosing groupings for this role |
+| 7 | Transform skills | Selects 10–20 skills for this role, ordered; one flat list, no categories |
 | 8 | Assemble & validate | Combines with identity and education, then checks it is fit to render |
 | 9 | Render | ReportLab PDF, tightening the layout to fit one page where it can |
 
@@ -312,6 +312,9 @@ reading order, with every bullet intact.
 - **No evaluation metrics yet.** The artifacts support transformation-magnitude,
   keyword-coverage, and unsupported-claim measurement, but none of that is implemented.
 - **No batch mode.** One posting per invocation.
+- **The skills section is a fixed-size selection.** Between 10 and 20 skills, drawn from
+  what the posting asks for and then from profile skills adjacent to it. The cap is
+  deliberate: it forces the model to choose, which is what makes the choice measurable.
 - **Bullet counts are coupled.** `EXPERIENCE_BULLET_COUNT` and `PROJECT_BULLET_COUNT` are
   validated deterministically *and* enforced by the response schemas. Changing the
   environment variable alone fails the run loudly rather than being ignored; change the

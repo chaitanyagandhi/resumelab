@@ -18,7 +18,6 @@ from resumelab.models.resume import (
     GeneratedExperience,
     GeneratedProject,
     GeneratedResume,
-    SkillGroup,
 )
 from resumelab.validation.resume_validator import validate_resume
 
@@ -31,7 +30,7 @@ def assemble_resume(
     summary: str,
     experiences: Sequence[GeneratedExperience],
     projects: Sequence[GeneratedProject],
-    skills: Sequence[SkillGroup],
+    skills: Sequence[str],
 ) -> GeneratedResume:
     """Build the final resume and check it is fit to render.
 
@@ -63,7 +62,7 @@ def assemble_resume(
     validate_resume(resume)
 
     logger.info(
-        "assembled resume experiences=%d projects=%d skill_groups=%d",
+        "assembled resume experiences=%d projects=%d skills=%d",
         len(resume.experiences),
         len(resume.projects),
         len(resume.skills),

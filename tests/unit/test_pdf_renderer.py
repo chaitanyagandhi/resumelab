@@ -224,11 +224,23 @@ def test_projects_render_their_repositioning(extracted, generated_resume):
             assert technology in extracted
 
 
-def test_skills_render_with_their_group_labels(extracted, generated_resume):
-    for group in generated_resume.skills:
-        assert group.label in extracted
-        for skill in group.skills:
-            assert skill in extracted
+def test_every_skill_is_rendered(extracted, generated_resume):
+    for skill in generated_resume.skills:
+        assert skill in extracted
+
+
+def test_skills_render_as_one_separated_line(extracted, generated_resume):
+    """Flat, not grouped: no labels, and the document's own separator between terms."""
+    first, second = generated_resume.skills[:2]
+
+    assert f"{first} \u00b7 {second}" in extracted
+
+
+def test_the_skill_separator_extracts_as_itself(extracted):
+    """The bullet glyph trap: a separator that renders but extracts as a control
+    character would be invisible here and wrong in every ATS."""
+    assert "\u00b7" in extracted
+    assert "\x7f" not in extracted
 
 
 def test_achievements_are_rendered_when_present(extracted, generated_resume):

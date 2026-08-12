@@ -13,7 +13,6 @@ from resumelab.models.resume import (
     GeneratedExperience,
     GeneratedProject,
     GeneratedResume,
-    SkillGroup,
 )
 from resumelab.models.strategy import (
     ExperienceDirection,
@@ -149,12 +148,24 @@ def generated_resume(candidate_profile):
             )
             for index in range(1, 4)
         ),
-        skills=(
-            SkillGroup(label="Languages", skills=("Go", "Java", "Python")),
-            SkillGroup(label="Storage & Systems", skills=("Linux", "NVMe-oF", "NFS")),
-        ),
+        skills=GENERATED_SKILLS,
         achievements=candidate_profile.achievements,
     )
+
+
+GENERATED_SKILLS = (
+    "Go",
+    "Java",
+    "Python",
+    "Linux",
+    "NVMe-oF",
+    "NFS",
+    "Distributed Systems",
+    "Replication",
+    "Kubernetes",
+    "PostgreSQL",
+)
+"""Ten skills: the floor the section is held to, so a fixture change is visible."""
 
 
 @pytest.fixture

@@ -1,9 +1,11 @@
 """Stage 7 — build the skills section around the target identity.
 
-The section is regenerated rather than filtered. Which groupings make a candidate
-look aligned is itself part of the repositioning, so the labels are chosen per run:
-a storage role and a GenAI role should not produce the same headings from the same
-source profile.
+The section is regenerated rather than filtered. Which skills a candidate is shown to
+have, and in what order, is itself part of the repositioning: a storage role and a
+GenAI role should not produce the same list from the same source profile.
+
+It is a selection, not a summary. The list is capped, so naming one thing costs
+naming another — which is what makes the choice measurable.
 
 Everything written so far is passed in, because the skills section is where a resume
 is most easily caught contradicting itself — a technology named in a bullet and then
@@ -19,7 +21,7 @@ from resumelab.llm.client import LLMClient
 from resumelab.llm.prompts import SKILLS_PROMPT
 from resumelab.models.analysis import JobAnalysis
 from resumelab.models.candidate import CandidateProfile
-from resumelab.models.resume import GeneratedSkills, SkillGroup
+from resumelab.models.resume import GeneratedSkills
 from resumelab.models.strategy import TransformationStrategy
 from resumelab.pipeline.context import (
     already_written_section,
@@ -38,7 +40,7 @@ def transform_skills(
     *,
     client: LLMClient,
     already_written: Sequence[str] = (),
-) -> tuple[SkillGroup, ...]:
+) -> tuple[str, ...]:
     """Build the skills section for this run.
 
     Args:
@@ -50,7 +52,7 @@ def transform_skills(
             consistent with the technologies those bullets claim.
 
     Returns:
-        The labeled skill groups, in the order they should be rendered.
+        The selected skills, in the order they should be rendered.
 
     Raises:
         LLMGenerationError: If no valid skills section could be produced.
@@ -72,10 +74,6 @@ def transform_skills(
         purpose=SKILLS_PROMPT.name,
     )
 
-    logger.info(
-        "transformed skills groups=%d skills=%d",
-        len(generated.groups),
-        generated.skill_count,
-    )
-    logger.debug("skill groups: %s", ", ".join(group.label for group in generated.groups))
-    return generated.groups
+    logger.info("transformed skills count=%d", generated.skill_count)
+    logger.debug("skills: %s", ", ".join(generated.skills))
+    return generated.skills

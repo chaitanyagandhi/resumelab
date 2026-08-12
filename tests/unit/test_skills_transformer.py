@@ -12,29 +12,35 @@ from pydantic import ValidationError
 from resumelab.exceptions import LLMGenerationError
 from resumelab.llm.prompts import SKILLS_PROMPT
 from resumelab.models.resume import (
-    MAX_SKILL_GROUPS,
-    MAX_SKILLS_PER_GROUP,
-    MAX_TOTAL_SKILLS,
-    MIN_SKILL_GROUPS,
+    MAX_SKILL_COUNT,
+    MIN_SKILL_COUNT,
     GeneratedSkills,
-    SkillGroup,
 )
 from resumelab.pipeline import transform_skills
 
-GROUPS = (
-    SkillGroup(label="Languages", skills=("Go", "Java", "C", "Python")),
-    SkillGroup(label="Storage & Systems", skills=("Linux", "NVMe", "NVMe-oF", "NFS", "SMB")),
-    SkillGroup(label="Infrastructure", skills=("Kubernetes", "Terraform", "AWS")),
+SKILLS = (
+    "Go",
+    "Java",
+    "C",
+    "Linux",
+    "NVMe",
+    "NVMe-oF",
+    "NFS",
+    "SMB",
+    "Kubernetes",
+    "Terraform",
+    "Distributed Systems",
+    "Replication",
 )
 
 
-def skills(groups=GROUPS) -> GeneratedSkills:
-    return GeneratedSkills(groups=groups)
+def skills(items=SKILLS) -> GeneratedSkills:
+    return GeneratedSkills(skills=items)
 
 
-def group(label: str, *items: str) -> SkillGroup:
-    """Build a group; pass no skills to test the empty case."""
-    return SkillGroup(label=label, skills=items)
+def listing(count: int) -> tuple[str, ...]:
+    """A distinct skill list of exactly ``count`` entries, with no fallback."""
+    return tuple(f"Skill{index}" for index in range(count))
 
 
 @pytest.fixture
@@ -49,91 +55,74 @@ def run(profile, analysis, strategy, client, **kwargs):
 # --- the schema -----------------------------------------------------------
 
 
-def test_the_nested_schema_survives_strict_mode_conversion():
+def test_the_schema_survives_strict_mode_conversion():
+    """Adding a JSON-Schema constraint here would pass locally and fail at request time."""
     strict = to_strict_json_schema(GeneratedSkills)
 
     assert strict["additionalProperties"] is False
-    for definition in strict["$defs"].values():
-        assert definition["additionalProperties"] is False
-        assert set(definition["required"]) == set(definition["properties"])
+    assert set(strict["required"]) == set(strict["properties"])
+
+
+def test_the_section_is_a_flat_list():
+    """No labels, no nesting: the section is rendered as one line."""
+    assert to_strict_json_schema(GeneratedSkills)["properties"]["skills"]["type"] == "array"
+    assert skills().skills[0] == "Go"
 
 
 def test_a_complete_skills_section_validates():
-    assert len(skills().groups) == 3
     assert skills().skill_count == 12
 
 
-@pytest.mark.parametrize("count", [0, 1, MAX_SKILL_GROUPS + 1])
-def test_the_group_count_is_bounded(count):
-    groups = tuple(group(f"Group {index}", "Go") for index in range(count))
-
-    with pytest.raises(ValidationError, match="between 2 and 6 groups"):
-        skills(groups)
+# --- the count is the whole point -----------------------------------------
 
 
-def test_the_minimum_number_of_groups_is_accepted():
-    assert len(skills((group("A", "Go"), group("B", "Java"))).groups) == MIN_SKILL_GROUPS
+@pytest.mark.parametrize("count", [0, 1, MIN_SKILL_COUNT - 1, MAX_SKILL_COUNT + 1])
+def test_the_skill_count_is_bounded(count):
+    """A section that lists everything says nothing about who is being presented."""
+    with pytest.raises(ValidationError, match="between 10 and 20 skills"):
+        skills(listing(count))
 
 
-def test_a_group_must_list_a_skill():
-    with pytest.raises(ValidationError, match="at least one skill"):
-        skills((group("Languages"), group("Empty")))
+@pytest.mark.parametrize("count", [MIN_SKILL_COUNT, MAX_SKILL_COUNT])
+def test_the_bounds_themselves_are_accepted(count):
+    assert skills(listing(count)).skill_count == count
 
 
-def test_an_overlong_group_is_rejected():
-    too_many = tuple(f"Skill{index}" for index in range(MAX_SKILLS_PER_GROUP + 1))
+def test_duplicates_are_cleaned_before_the_count_is_judged():
+    """A repeated term is a formatting slip, not worth an API call to repair."""
+    cleaned = skills(("Go", "go", "  GO  ", *listing(9)))
 
-    with pytest.raises(ValidationError, match="at most 12 skills"):
-        skills((group("Languages", *too_many), group("Other", "Go")))
-
-
-def test_the_whole_section_is_capped():
-    """The total is where keyword stuffing shows up."""
-    groups = tuple(
-        group(f"Group {index}", *(f"Skill{index}-{n}" for n in range(MAX_SKILLS_PER_GROUP)))
-        for index in range(4)
-    )
-
-    with pytest.raises(ValidationError, match=f"at most {MAX_TOTAL_SKILLS} skills in total"):
-        skills(groups)
+    assert cleaned.skills[0] == "Go"
+    assert cleaned.skill_count == MIN_SKILL_COUNT
 
 
-def test_duplicate_labels_are_rejected():
-    with pytest.raises(ValidationError, match="labels must be distinct"):
-        skills((group("Languages", "Go"), group("languages", "Java")))
+def test_duplicates_that_drop_the_count_below_the_floor_are_rejected():
+    """Cleaning happens first, so the rejection describes what is actually wrong."""
+    with pytest.raises(ValidationError, match="got 2"):
+        skills(("Go", "go", "Java", "java", "GO"))
 
 
-def test_the_same_skill_in_two_groups_is_rejected():
-    """It reads as carelessness, and it is worth a repair attempt."""
-    with pytest.raises(ValidationError, match="more than one group"):
-        skills((group("Languages", "Go"), group("Backend", "go")))
+def test_blank_entries_are_dropped():
+    cleaned = skills(("Go", "", "   ", *listing(9)))
+
+    assert "" not in cleaned.skills
+    assert cleaned.skill_count == MIN_SKILL_COUNT
 
 
-def test_duplicates_inside_a_group_are_cleaned_rather_than_rejected():
-    cleaned = skills((group("Languages", "Go", "go", "  Java  "), group("Other", "Linux")))
-
-    assert cleaned.groups[0].skills == ("Go", "Java")
-
-
-@pytest.mark.parametrize("blank", ["", "   "])
-def test_a_blank_label_is_rejected(blank):
-    with pytest.raises(ValidationError):
-        skills((group(blank, "Go"), group("Other", "Java")))
+def test_the_chosen_order_is_preserved():
+    """Order is the only emphasis the section has."""
+    assert skills().skills == SKILLS
 
 
 # --- what the stage asks for ----------------------------------------------
 
 
-def test_the_groups_are_returned_in_order(
+def test_the_skills_are_returned_in_order(
     candidate_profile, job_analysis, transformation_strategy, client
 ):
     returned = run(candidate_profile, job_analysis, transformation_strategy, client)
 
-    assert [entry.label for entry in returned] == [
-        "Languages",
-        "Storage & Systems",
-        "Infrastructure",
-    ]
+    assert returned == SKILLS
 
 
 def test_one_call_builds_the_section(
@@ -154,9 +143,10 @@ def test_the_versioned_prompt_is_used_verbatim(
     assert client.last_call.response_model is GeneratedSkills
 
 
-def test_the_source_skills_are_the_starting_point(
+def test_the_source_skills_are_available_as_a_fallback(
     candidate_profile, job_analysis, transformation_strategy, client
 ):
+    """When the posting names too few skills, the profile is what is drawn from."""
     run(candidate_profile, job_analysis, transformation_strategy, client)
 
     user_prompt = client.last_call.user_prompt
@@ -206,14 +196,17 @@ def test_with_nothing_written_yet_the_section_is_omitted(
     assert "BULLETS ALREADY WRITTEN" not in client.last_call.user_prompt
 
 
-def test_the_prompt_requires_consistency_and_forbids_keyword_dumping(
+def test_the_prompt_states_the_selection_rule(
     candidate_profile, job_analysis, transformation_strategy, client
 ):
-    run(candidate_profile, job_analysis, transformation_strategy, client)
+    """The posting first, the profile's related skills only to make up the number."""
+    system_prompt = client.last_call.system_prompt if client.calls else SKILLS_PROMPT.system
 
-    system_prompt = client.last_call.system_prompt
-    assert "Every technology named anywhere else on this resume must appear here" in system_prompt
-    assert "Do not dump the job description's keyword list" in system_prompt
+    assert "Between 10 and 20 skills" in system_prompt
+    assert "No categories" in system_prompt
+    assert "closely related" in system_prompt
+    assert "Do not pad the list" in system_prompt
+    assert "Select and order; do not transcribe." in system_prompt
 
 
 # --- failure handling -----------------------------------------------------
@@ -238,5 +231,5 @@ def test_the_stage_logs_what_it_produced(
         run(candidate_profile, job_analysis, transformation_strategy, client)
 
     assert "transforming skills" in caplog.text
-    assert "groups=3 skills=12" in caplog.text
-    assert "Storage & Systems" in caplog.text
+    assert "count=12" in caplog.text
+    assert "NVMe-oF" in caplog.text

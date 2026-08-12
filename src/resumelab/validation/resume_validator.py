@@ -175,7 +175,5 @@ def _rendered_text(resume: GeneratedResume) -> list[tuple[str, str]]:
         fields.append((f"{where} subtitle", project.subtitle))
         fields += [(f"{where} technology {i}", t) for i, t in enumerate(project.technologies, 1)]
         fields += [(f"{where} bullet {i}", b) for i, b in enumerate(project.bullets, 1)]
-    for group in resume.skills:
-        fields.append((f"skill group {group.label!r}", group.label))
-        fields += [(f"skill {s!r}", s) for s in group.skills]
+    fields += [(f"skill {skill!r}", skill) for skill in resume.skills]
     return fields

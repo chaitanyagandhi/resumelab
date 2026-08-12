@@ -25,12 +25,12 @@ import yaml
 from resumelab.llm.client import LLMCallStats, TokenUsage
 from resumelab.models.analysis import JobAnalysis
 from resumelab.models.resume import (
+    MAX_SKILL_COUNT,
     CondensedContent,
     ExperienceBullets,
     GeneratedSkills,
     GeneratedSummary,
     ProjectContent,
-    SkillGroup,
 )
 from resumelab.models.strategy import (
     ExperienceDirection,
@@ -214,14 +214,27 @@ class DeterministicLLM:
         )
 
     def _skills(self, prompt: str) -> GeneratedSkills:
+        """Lead with the posting's own priority terms, then pad to the floor.
+
+        The padding is fixed and generic, so any posting-specific term in the
+        rendered section came from the posting rather than from this fake.
+        """
         strategy = _json_section(prompt, "TRANSFORMATION STRATEGY")
         priority = list(dict.fromkeys(strategy["skills_priority"])) or ["Systems"]
-        return GeneratedSkills(
-            groups=(
-                SkillGroup(label="Core", skills=tuple(priority[:4])),
-                SkillGroup(label="Systems", skills=("Linux", "Distributed Systems")),
-            )
-        )
+        padding = [
+            "Linux",
+            "Distributed Systems",
+            "Concurrency",
+            "Profiling",
+            "Benchmarking",
+            "Observability",
+            "Docker",
+            "Kubernetes",
+            "PostgreSQL",
+            "Git",
+        ]
+        selected = list(dict.fromkeys([*priority, *padding]))
+        return GeneratedSkills(skills=tuple(selected[:MAX_SKILL_COUNT]))
 
     def _condensed(self, prompt: str) -> CondensedContent:
         bullets = re.findall(r"^\d+\. (.+)$", prompt, flags=re.MULTILINE)

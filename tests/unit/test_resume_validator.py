@@ -187,12 +187,9 @@ def test_control_characters_in_the_summary_are_rejected(generated_resume):
 
 
 def test_control_characters_in_a_skill_are_rejected(generated_resume):
-    group = generated_resume.skills[0]
-    tainted = group.model_copy(update={"skills": ("Go\x00", *group.skills[1:])})
+    tainted = ("Go\x00", *generated_resume.skills[1:])
 
-    assert "control characters" in failures(
-        replace(generated_resume, skills=(tainted, *generated_resume.skills[1:]))
-    )
+    assert "control characters" in failures(replace(generated_resume, skills=tainted))
 
 
 def test_control_characters_in_a_project_subtitle_are_rejected(generated_resume):

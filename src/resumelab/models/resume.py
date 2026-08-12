@@ -18,7 +18,7 @@ from resumelab.models.candidate import (
     Education,
     PersonalDetails,
 )
-from resumelab.models.common import GENERATED_MODEL_CONFIG, clean_items, require_content
+from resumelab.models.common import GENERATED_MODEL_CONFIG, clean_items
 
 REQUIRED_EXPERIENCE_BULLET_COUNT = 3
 """Bullets emitted per role. A fixed count keeps runs comparable."""
@@ -35,17 +35,15 @@ MIN_PROJECT_TECHNOLOGIES = 2
 MAX_PROJECT_TECHNOLOGIES = 10
 """Beyond this the list stops being read and starts looking padded."""
 
-MIN_SKILL_GROUPS = 2
-"""One group is a wall of text; the section exists to be scannable."""
+MIN_SKILL_COUNT = 10
+"""Below this the section reads as a thin candidate rather than a focused one."""
 
-MAX_SKILL_GROUPS = 6
-"""Enough to organize a stack, few enough to stay compact on one page."""
+MAX_SKILL_COUNT = 20
+"""Beyond this the section stops being a selection and becomes a keyword dump.
 
-MAX_SKILLS_PER_GROUP = 12
-"""A longer row wraps and stops being read."""
-
-MAX_TOTAL_SKILLS = 40
-"""A ceiling on the whole section, which is where keyword stuffing shows up."""
+The ceiling is the point: a skills list that names everything says nothing about
+what this candidate is being presented as, which is the thing under study.
+"""
 
 MIN_BULLET_CHARACTERS = 40
 """Below this a bullet cannot carry implementation, detail, and impact."""
@@ -244,68 +242,39 @@ class GeneratedProject(BaseModel):
     bullets: tuple[str, ...]
 
 
-def _check_group_skills(values: tuple[str, ...]) -> tuple[str, ...]:
-    """Require a group to carry a readable number of skills."""
+def _check_skills(values: tuple[str, ...]) -> tuple[str, ...]:
+    """Hold the section to a selected, readable number of skills.
+
+    Duplicates are sanitized away by :func:`clean_items` before counting, so a model
+    that repeats a term is not charged an API call for it. The count is checked after
+    that, because it is a content decision: too few or too many means the model chose
+    badly, and choosing again is what the repair loop is for.
+    """
     cleaned = clean_items(values)
-    if not cleaned:
-        raise ValueError("must list at least one skill")
-    if len(cleaned) > MAX_SKILLS_PER_GROUP:
-        raise ValueError(f"must list at most {MAX_SKILLS_PER_GROUP} skills, got {len(cleaned)}")
+    if not MIN_SKILL_COUNT <= len(cleaned) <= MAX_SKILL_COUNT:
+        raise ValueError(
+            f"must list between {MIN_SKILL_COUNT} and {MAX_SKILL_COUNT} skills, got {len(cleaned)}"
+        )
     return cleaned
 
 
-class SkillGroup(BaseModel):
-    """One labeled row of the skills section, e.g. ``Languages: Go, Java, C``."""
-
-    model_config = GENERATED_MODEL_CONFIG
-
-    label: Annotated[str, AfterValidator(require_content)]
-    skills: Annotated[tuple[str, ...], AfterValidator(_check_group_skills)]
-
-
 class GeneratedSkills(BaseModel):
-    """The skills section, grouped as this role's reader would expect to see it.
+    """The skills section: one selected, ordered list.
 
-    The labels are chosen per run rather than inherited from the source profile: which
-    groupings make a candidate look aligned is itself part of the repositioning.
+    Deliberately flat. Categories were tried and removed: a grouped section invites
+    the model to fill every group it invents, which turns selection into coverage and
+    buries what the candidate is being presented as. One line, in priority order, is
+    also how the section is actually read.
     """
 
     model_config = GENERATED_MODEL_CONFIG
 
-    groups: tuple[SkillGroup, ...]
-
-    @model_validator(mode="after")
-    def _check_groups(self) -> GeneratedSkills:
-        if not MIN_SKILL_GROUPS <= len(self.groups) <= MAX_SKILL_GROUPS:
-            raise ValueError(
-                f"must contain between {MIN_SKILL_GROUPS} and {MAX_SKILL_GROUPS} groups, "
-                f"got {len(self.groups)}"
-            )
-        _reject_duplicate_labels(self.groups)
-        _reject_duplicate_skills(self.groups)
-        if self.skill_count > MAX_TOTAL_SKILLS:
-            raise ValueError(
-                f"must list at most {MAX_TOTAL_SKILLS} skills in total, got {self.skill_count}"
-            )
-        return self
+    skills: Annotated[tuple[str, ...], AfterValidator(_check_skills)]
 
     @property
     def skill_count(self) -> int:
-        """Total skills across every group."""
-        return sum(len(group.skills) for group in self.groups)
-
-
-def _reject_duplicate_labels(groups: tuple[SkillGroup, ...]) -> None:
-    labels = [group.label.casefold() for group in groups]
-    if len(set(labels)) != len(labels):
-        raise ValueError("group labels must be distinct")
-
-
-def _reject_duplicate_skills(groups: tuple[SkillGroup, ...]) -> None:
-    """The same skill in two groups reads as carelessness."""
-    skills = [skill.casefold() for group in groups for skill in group.skills]
-    if len(set(skills)) != len(skills):
-        raise ValueError("a skill must not appear in more than one group")
+        """How many skills the section carries."""
+        return len(self.skills)
 
 
 class GeneratedExperience(BaseModel):
@@ -356,7 +325,7 @@ class GeneratedResume(BaseModel):
     education: tuple[Education, ...]
     experiences: tuple[GeneratedExperience, ...]
     projects: tuple[GeneratedProject, ...]
-    skills: tuple[SkillGroup, ...]
+    skills: tuple[str, ...]
     achievements: tuple[str, ...] = ()
 
     @property

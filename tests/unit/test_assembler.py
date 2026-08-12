@@ -90,4 +90,4 @@ def test_assembly_is_logged(candidate_profile, parts, caplog):
         assemble_resume(candidate_profile, **parts)
 
     assert "assembling resume" in caplog.text
-    assert "experiences=1 projects=3 skill_groups=2" in caplog.text
+    assert "experiences=1 projects=3 skills=10" in caplog.text

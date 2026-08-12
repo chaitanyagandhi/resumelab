@@ -31,7 +31,6 @@ from resumelab.models.resume import (
     GeneratedExperience,
     GeneratedProject,
     GeneratedResume,
-    SkillGroup,
 )
 from resumelab.rendering import styles
 
@@ -236,14 +235,15 @@ def _projects(
 
 
 def _skills(
-    groups: Iterable[SkillGroup],
+    skills: Iterable[str],
     stylesheet: dict[str, ParagraphStyle],
 ) -> Iterable[Flowable]:
-    for group in groups:
-        yield Paragraph(
-            f"{_bold(f'{group.label}:')} {_text(', '.join(group.skills))}",
-            stylesheet["body"],
-        )
+    """Render the section as one wrapped line, in the order the model chose.
+
+    The same middle dot that separates a role's company, location, and dates, so the
+    document has one separator rather than one per section.
+    """
+    yield Paragraph(styles.SEPARATOR.join(_text(skill) for skill in skills), stylesheet["body"])
 
 
 def _section(

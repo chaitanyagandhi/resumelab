@@ -20,7 +20,6 @@ from resumelab.models.resume import (
     GeneratedSkills,
     GeneratedSummary,
     ProjectContent,
-    SkillGroup,
 )
 
 OPENAI_KEY = "sk-test-not-a-real-key"
@@ -60,13 +59,22 @@ def pipeline_responses(job_analysis, transformation_strategy):
         project_content(1),
         project_content(2),
         project_content(3),
-        GeneratedSkills(
-            groups=(
-                SkillGroup(label="Languages", skills=("Go", "Java", "Python")),
-                SkillGroup(label="Storage & Systems", skills=("Linux", "NVMe-oF", "NFS")),
-            )
-        ),
+        GeneratedSkills(skills=SKILLS),
     ]
+
+
+SKILLS = (
+    "Go",
+    "Java",
+    "Python",
+    "Linux",
+    "NVMe-oF",
+    "NFS",
+    "Distributed Systems",
+    "Replication",
+    "Kubernetes",
+    "PostgreSQL",
+)
 
 
 @pytest.fixture
