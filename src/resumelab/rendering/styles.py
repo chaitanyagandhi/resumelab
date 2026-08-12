@@ -119,8 +119,8 @@ the base-14 encoding (``▪``, ``∙``) are drawn from a different part of the
 repertoire, and several of them extract as U+25A0 regardless of what was asked for.
 """
 
-BULLET_FONT_SIZE = 6.5
-"""Drawn below the body size, so the bullet marks the line without competing with it."""
+BULLET_FONT_SIZE = 8.0
+"""Just under the body size: a list marker should be seen without being read."""
 
 BULLET_OFFSET_Y = 0.0
 """No lift needed: this glyph is already drawn at mid-height within its em.
@@ -133,12 +133,23 @@ BULLET_INDENT = 9.0
 BULLET_TEXT_INDENT = 18.0
 """Text hangs at this indent so wrapped bullet lines align under the first."""
 
-SEPARATOR = f' <font name="{GLYPH_FONT}">•</font> '
+SEPARATOR_SIZE_DELTA = -3.0
+"""Points below the surrounding text, so the separator stays a dot.
+
+Expressed as a delta rather than a size because the separator appears at three
+different text sizes, and because the whole layout is scaled to fit the page —
+an absolute size here would grow relative to the text every time the page tightened.
+"""
+
+SEPARATOR = f' <font name="{GLYPH_FONT}" size="{SEPARATOR_SIZE_DELTA:g}">•</font> '
 """Separates fields on one line. A single flow extracts far better than columns.
 
-The glyph is tagged into :data:`GLYPH_FONT` while the surrounding text stays
-Helvetica, because Helvetica draws its middle dot as a square. Only the separator
-changes font; the size is inherited, so it still scales with the layout.
+The same round glyph as the list bullet, drawn small. It is a divider between terms
+rather than a marker in front of them, so at bullet size it would read as a list laid
+sideways and would out-shout the words it separates.
+
+Tagged into :data:`GLYPH_FONT` while the surrounding text stays Helvetica, whose own
+middle dot is square.
 """
 
 DATE_RANGE_SEPARATOR = " \u2013 "

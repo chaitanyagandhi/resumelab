@@ -11,7 +11,7 @@ import pytest
 from pypdf import PdfReader
 
 from resumelab.exceptions import PDFRenderingError, ResumeLabError
-from resumelab.rendering import render_resume
+from resumelab.rendering import render_resume, styles
 from resumelab.rendering.styles import (
     LAYOUT_SCALES,
     MIN_BODY_FONT_SIZE,
@@ -467,3 +467,15 @@ def test_an_unlayoutable_document_is_reported_as_a_rendering_error(
 
     with pytest.raises(PDFRenderingError, match="could not be laid out"):
         render_resume(generated_resume, tmp_path / "impossible.pdf")
+
+
+def test_the_separator_is_smaller_than_the_list_bullet():
+    """They are the same glyph doing opposite jobs.
+
+    A bullet marks the start of a line and should be seen; a separator divides terms
+    within one and should not compete with them. Drawn at the same size, the skills
+    section reads as a list laid sideways.
+    """
+    assert styles.SEPARATOR_SIZE_DELTA < 0
+    assert styles.BULLET_FONT_SIZE < styles.BODY_FONT_SIZE
+    assert styles.BODY_FONT_SIZE + styles.SEPARATOR_SIZE_DELTA < styles.BULLET_FONT_SIZE
