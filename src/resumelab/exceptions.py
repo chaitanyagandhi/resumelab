@@ -28,6 +28,15 @@ class JDAnalysisError(ResumeLabError):
     """The job description could not be loaded or analyzed into a structured form."""
 
 
+class JDFetchError(JDAnalysisError):
+    """A job posting URL could not be fetched, or held no recognizable posting.
+
+    A subclass of :class:`JDAnalysisError` because fetching is one more way of
+    supplying a job description: every caller that already handles a posting failing
+    to load handles this too, without knowing a network was involved.
+    """
+
+
 class LLMGenerationError(ResumeLabError):
     """An LLM call failed, or its response could not be validated after retries."""
 
