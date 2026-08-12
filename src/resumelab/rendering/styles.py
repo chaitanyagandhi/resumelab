@@ -49,18 +49,33 @@ Bitstream Vera Sans ships inside ReportLab under a permissive license, so this a
 no dependency and no file that has to be found at run time.
 """
 
-_GLYPH_FONT_FILE = Path(reportlab.__file__).parent / "fonts" / "Vera.ttf"
+GLYPH_FONT_BOLD = "ResumeLabGlyph-Bold"
+"""The bold weight of :data:`GLYPH_FONT`, used for the list bullet.
+
+A bullet drawn at the regular weight is a thin ring of ink at this size and reads as
+faint beside the text it introduces. The bold weight is a denser dot at the same
+diameter, which is what makes a list scan as a list.
+"""
+
+_GLYPH_FONT_FILES = {
+    GLYPH_FONT: "Vera.ttf",
+    GLYPH_FONT_BOLD: "VeraBd.ttf",
+}
+
+_FONT_DIRECTORY = Path(reportlab.__file__).parent / "fonts"
 
 
 def register_fonts() -> None:
-    """Make :data:`GLYPH_FONT` available to the renderer.
+    """Make the glyph fonts available to the renderer.
 
     Idempotent: rendering several resumes in one process registers once. ReportLab's
     font registry is process-global, which is why this is a function rather than an
     import-time side effect — a caller that never renders should not pay for it.
     """
-    if GLYPH_FONT not in pdfmetrics.getRegisteredFontNames():
-        pdfmetrics.registerFont(TTFont(GLYPH_FONT, str(_GLYPH_FONT_FILE)))
+    registered = pdfmetrics.getRegisteredFontNames()
+    for name, filename in _GLYPH_FONT_FILES.items():
+        if name not in registered:
+            pdfmetrics.registerFont(TTFont(name, str(_FONT_DIRECTORY / filename)))
 
 
 BODY_FONT_SIZE = 9.5
@@ -119,8 +134,8 @@ the base-14 encoding (``▪``, ``∙``) are drawn from a different part of the
 repertoire, and several of them extract as U+25A0 regardless of what was asked for.
 """
 
-BULLET_FONT_SIZE = 8.0
-"""Just under the body size: a list marker should be seen without being read."""
+BULLET_FONT_SIZE = 9.5
+"""Body size, at the bold weight. Smaller than this the marker reads as a speck."""
 
 BULLET_OFFSET_Y = 0.0
 """No lift needed: this glyph is already drawn at mid-height within its em.
@@ -242,7 +257,7 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             leading=_leading(body),
             leftIndent=_scaled(BULLET_TEXT_INDENT, scale),
             bulletIndent=_scaled(BULLET_INDENT, scale),
-            bulletFontName=GLYPH_FONT,
+            bulletFontName=GLYPH_FONT_BOLD,
             bulletFontSize=_scaled(BULLET_FONT_SIZE, scale),
             bulletOffsetY=_scaled(BULLET_OFFSET_Y, scale),
             spaceAfter=_scaled(SPACE_BETWEEN_BULLETS, scale),

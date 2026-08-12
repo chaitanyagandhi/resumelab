@@ -9,6 +9,7 @@ import logging
 
 import pytest
 from pypdf import PdfReader
+from reportlab.pdfbase import pdfmetrics
 
 from resumelab.exceptions import PDFRenderingError, ResumeLabError
 from resumelab.rendering import render_resume, styles
@@ -477,5 +478,13 @@ def test_the_separator_is_smaller_than_the_list_bullet():
     section reads as a list laid sideways.
     """
     assert styles.SEPARATOR_SIZE_DELTA < 0
-    assert styles.BULLET_FONT_SIZE < styles.BODY_FONT_SIZE
+    assert styles.BULLET_FONT_SIZE <= styles.BODY_FONT_SIZE
     assert styles.BODY_FONT_SIZE + styles.SEPARATOR_SIZE_DELTA < styles.BULLET_FONT_SIZE
+
+
+def test_the_list_bullet_is_drawn_at_the_bold_weight():
+    """At the regular weight the bullet is a thin ring and reads as faint."""
+    bullet = styles.build_stylesheet()["bullet"]
+
+    assert bullet.bulletFontName == styles.GLYPH_FONT_BOLD
+    assert styles.GLYPH_FONT_BOLD in pdfmetrics.getRegisteredFontNames()
