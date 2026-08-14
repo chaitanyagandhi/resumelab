@@ -15,12 +15,13 @@ from pathlib import Path
 
 import reportlab
 from reportlab.lib.colors import HexColor
-from reportlab.lib.enums import TA_CENTER, TA_LEFT
+from reportlab.lib.enums import TA_CENTER, TA_LEFT, TA_RIGHT
 from reportlab.lib.pagesizes import LETTER
 from reportlab.lib.styles import ParagraphStyle
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.platypus import TableStyle
 
 # --- page -------------------------------------------------------------------
 PAGE_SIZE = LETTER
@@ -29,6 +30,12 @@ PAGE_SIZE = LETTER
 MARGIN_HORIZONTAL = 0.6 * inch
 MARGIN_TOP = 0.5 * inch
 MARGIN_BOTTOM = 0.5 * inch
+
+CONTENT_WIDTH = PAGE_SIZE[0] - 2 * MARGIN_HORIZONTAL
+"""Width available between the margins, which a right-aligned date is measured against."""
+
+MIN_HEADING_WIDTH = 1.5 * inch
+"""Floor for the heading column, so an absurd date cannot squeeze the title away."""
 
 # --- type -------------------------------------------------------------------
 FONT_REGULAR = "Helvetica"
@@ -171,6 +178,25 @@ DATE_RANGE_SEPARATOR = " \u2013 "
 """En dash, the typographic convention for a span of dates."""
 
 
+def heading_row_style() -> TableStyle:
+    """Styling for the two-cell row that sets a heading against its date.
+
+    A row, not a layout: one line, two cells, no rules and no padding, so the pair
+    occupies exactly the space the paragraph would have. Text still extracts in
+    reading order \u2014 heading, then date, then the bullets beneath \u2014 which is the
+    property that decides whether a resume survives being parsed.
+    """
+    return TableStyle(
+        [
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ]
+    )
+
+
 def _scaled(points: float, scale: float) -> float:
     """Apply the layout scale to a measurement, rounded to a stable value."""
     return round(points * scale, 2)
@@ -235,6 +261,14 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             leading=_leading(entry),
             spaceBefore=_scaled(SPACE_BETWEEN_ENTRIES, scale),
             spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING, scale),
+        ),
+        "date": style(
+            "date",
+            fontName=FONT_REGULAR,
+            fontSize=entry,
+            leading=_leading(entry),
+            alignment=TA_RIGHT,
+            textColor=MUTED_INK,
         ),
         "detail": style(
             "detail",

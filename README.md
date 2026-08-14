@@ -172,6 +172,10 @@ Three structural rules hold throughout:
 - **The model never produces the document.** It returns structured content; the renderer
   owns every layout decision. Any visual difference between two runs is a content
   difference.
+- **Dates are set flush right using a two-cell row**, the one table in the document.
+  What damages extraction is a multi-column *layout*, where a parser has to guess how
+  columns interleave; a single row of two paragraphs extracts as heading, then date,
+  then the bullets beneath. A test asserts that order.
 - **Every glyph on the page is checked to extract as itself.** Text is Helvetica, which
   needs no embedding; the bullet and the field separator are drawn from one embedded
   font, because in the standard PDF fonts the round bullet extracts as U+007F — a
@@ -324,8 +328,6 @@ reading order, with every bullet intact.
   validated deterministically *and* enforced by the response schemas. Changing the
   environment variable alone fails the run loudly rather than being ignored; change the
   matching constant in `models/` too.
-- **Right-aligned dates are not supported.** The only clean way to right-align them is a
-  table, and tables damage text extraction, so dates sit inline.
 - **One page is a target, not a guarantee.** The renderer tightens the layout within
   conservative limits and will condense once; content that still overflows is written as a
   readable two pages rather than shrunk into an unreadable one.

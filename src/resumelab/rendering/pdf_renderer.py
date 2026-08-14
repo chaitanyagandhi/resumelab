@@ -5,11 +5,16 @@ module owns every layout decision. That separation is what makes two runs visual
 comparable — any difference on the page is a difference in the content.
 
 The layout is built for machine reading as well as human reading. There are no
-images, no icons, and no multi-column tables: everything is a single linear flow of
-real text, so extraction returns the resume in reading order. Fields that a
-conventional resume right-aligns are instead placed inline, separated by a middle
-dot, because the only clean way to right-align them is a table, and tables are what
-break extraction.
+images and no icons, and the document is a single linear flow of real text, so
+extraction returns the resume in reading order.
+
+Dates are set flush right, which needs a two-cell row. That is the one place a table
+appears, and it is bounded deliberately: one line, two cells, no rules, each cell a
+single paragraph. What damages extraction is a multi-column *layout*, where a parser
+must guess how columns interleave. Here there is nothing to guess — the row extracts
+as heading, then date, then the bullets beneath it, which is the reading order. A
+test asserts exactly that, because it is the property the whole format exists to
+protect.
 """
 
 from __future__ import annotations
@@ -22,7 +27,8 @@ from pathlib import Path
 from xml.sax.saxutils import escape
 
 from reportlab.lib.styles import ParagraphStyle
-from reportlab.platypus import Flowable, HRFlowable, Paragraph, SimpleDocTemplate
+from reportlab.pdfbase import pdfmetrics
+from reportlab.platypus import Flowable, HRFlowable, Paragraph, SimpleDocTemplate, Table
 from reportlab.platypus.doctemplate import LayoutError
 
 from resumelab.exceptions import PDFRenderingError
@@ -190,11 +196,10 @@ def _education(
     stylesheet: dict[str, ParagraphStyle],
 ) -> Iterable[Flowable]:
     for entry in entries:
-        yield Paragraph(
-            _joined(
-                _bold(entry.institution), entry.location, _dates(entry.start_date, entry.end_date)
-            ),
-            stylesheet["entry"],
+        yield _heading_row(
+            _joined(_bold(entry.institution), entry.location),
+            _date_text(entry.start_date, entry.end_date),
+            stylesheet,
         )
         qualification = " ".join(part for part in (entry.degree, entry.field) if part)
         gpa = f"GPA: {entry.gpa}" if entry.gpa else ""
@@ -208,14 +213,10 @@ def _experiences(
     stylesheet: dict[str, ParagraphStyle],
 ) -> Iterable[Flowable]:
     for entry in entries:
-        yield Paragraph(
-            _joined(
-                _bold(entry.company),
-                entry.title,
-                entry.location,
-                _dates(entry.start_date, entry.end_date),
-            ),
-            stylesheet["entry"],
+        yield _heading_row(
+            _joined(_bold(entry.company), entry.title, entry.location),
+            _date_text(entry.start_date, entry.end_date),
+            stylesheet,
         )
         for bullet in entry.bullets:
             yield _bullet(bullet, stylesheet)
@@ -227,7 +228,7 @@ def _projects(
 ) -> Iterable[Flowable]:
     for entry in entries:
         heading = f"{_bold(entry.name)} — {_text(entry.subtitle)}"
-        yield Paragraph(_joined(heading, entry.date), stylesheet["entry"])
+        yield _heading_row(heading, entry.date or "", stylesheet)
         if entry.technologies:
             yield Paragraph(_text(", ".join(entry.technologies)), stylesheet["detail"])
         for bullet in entry.bullets:
@@ -279,11 +280,45 @@ def _is_markup(part: str) -> bool:
     return part.startswith("<")
 
 
-def _dates(start: str | None, end: str | None) -> str:
-    """Render a date range, tolerating either end being absent."""
+def _date_text(start: str | None, end: str | None) -> str:
+    """A date range as plain text, tolerating either end being absent.
+
+    Plain rather than escaped markup because it is measured before it is drawn, and a
+    width taken from escaped text would be the width of ``&amp;`` rather than ``&``.
+    """
     if start and end:
-        return f"{_text(start)}{styles.DATE_RANGE_SEPARATOR}{_text(end)}"
-    return _text(start or end or "")
+        return f"{start}{styles.DATE_RANGE_SEPARATOR}{end}"
+    return start or end or ""
+
+
+def _heading_row(
+    heading: str,
+    date: str,
+    stylesheet: dict[str, ParagraphStyle],
+) -> Flowable:
+    """Set ``heading`` against ``date``, with the date flush to the right margin.
+
+    The date column is measured to its own content rather than fixed, so the date
+    lands on the margin at every layout scale and the heading keeps everything else.
+    An entry with no date is a plain paragraph — an empty column would still consume
+    its width and pull the heading in for no reason.
+    """
+    if not date:
+        return Paragraph(heading, stylesheet["entry"])
+
+    date_style = stylesheet["date"]
+    date_width = pdfmetrics.stringWidth(date, date_style.fontName, date_style.fontSize)
+    heading_width = max(styles.CONTENT_WIDTH - date_width, styles.MIN_HEADING_WIDTH)
+
+    row = Table(
+        [[Paragraph(heading, stylesheet["entry"]), Paragraph(_text(date), date_style)]],
+        colWidths=[heading_width, date_width],
+        style=styles.heading_row_style(),
+    )
+    # A Table is not a Paragraph, so the entry spacing has to be carried over by hand.
+    row.spaceBefore = stylesheet["entry"].spaceBefore
+    row.spaceAfter = stylesheet["entry"].spaceAfter
+    return row
 
 
 def _bold(text: str) -> str:

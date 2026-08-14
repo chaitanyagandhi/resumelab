@@ -9,10 +9,11 @@ import logging
 
 import pytest
 from pypdf import PdfReader
+from reportlab.lib.enums import TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
 
 from resumelab.exceptions import PDFRenderingError, ResumeLabError
-from resumelab.rendering import render_resume, styles
+from resumelab.rendering import pdf_renderer, render_resume, styles
 from resumelab.rendering.styles import (
     LAYOUT_SCALES,
     MIN_BODY_FONT_SIZE,
@@ -429,7 +430,16 @@ def test_rendering_is_logged(tmp_path, generated_resume, caplog):
 def test_the_stylesheet_covers_every_role_the_renderer_uses():
     stylesheet = build_stylesheet()
 
-    assert set(stylesheet) == {"name", "contact", "section", "entry", "detail", "body", "bullet"}
+    assert set(stylesheet) == {
+        "name",
+        "contact",
+        "section",
+        "entry",
+        "date",
+        "detail",
+        "body",
+        "bullet",
+    }
 
 
 def test_leading_is_proportional_to_font_size():
@@ -488,3 +498,53 @@ def test_the_list_bullet_is_drawn_at_the_bold_weight():
 
     assert bullet.bulletFontName == styles.GLYPH_FONT_BOLD
     assert styles.GLYPH_FONT_BOLD in pdfmetrics.getRegisteredFontNames()
+
+
+# --- right-aligned dates --------------------------------------------------
+
+
+def test_a_right_aligned_date_still_extracts_in_reading_order(extracted, generated_resume):
+    """The property the two-cell row had to preserve.
+
+    A multi-column layout forces a parser to guess how columns interleave. This row
+    must not: the date belongs to the heading above it and must arrive between that
+    heading and the bullets beneath, exactly as a person reads it.
+    """
+    entry = generated_resume.experiences[0]
+
+    company = extracted.index(entry.company)
+    date = extracted.index(entry.start_date, company)
+    first_bullet = extracted.index(entry.bullets[0], company)
+
+    assert company < date < first_bullet
+
+
+def test_the_date_is_set_against_the_right_margin():
+    """The heading and its date together span the full content width.
+
+    That is what puts the date on the margin: the date column is exactly as wide as
+    the date, and the heading column takes everything else.
+    """
+    stylesheet = build_stylesheet()
+    row = pdf_renderer._heading_row("<b>Northlake</b>", "Jul 2025 \u2013 May 2026", stylesheet)
+
+    assert stylesheet["date"].alignment == TA_RIGHT
+    assert sum(row._argW) == pytest.approx(styles.CONTENT_WIDTH)
+
+
+def test_a_long_date_cannot_squeeze_the_heading_away(generated_resume):
+    """The heading column has a floor, so an absurd date degrades rather than erases."""
+    row = pdf_renderer._heading_row("<b>Northlake</b>", "x" * 400, build_stylesheet())
+
+    assert row._argW[0] >= styles.MIN_HEADING_WIDTH
+
+
+def test_an_entry_without_a_date_is_not_given_an_empty_column(tmp_path, generated_resume):
+    """An empty column would still take its width and pull the heading in."""
+    undated = generated_resume.projects[0].model_copy(update={"date": None})
+    resume = generated_resume.model_copy(update={"projects": (undated,)})
+
+    text = _text_of(render_resume(resume, tmp_path / "undated.pdf").path)
+
+    assert undated.name in _flatten(text)
+    assert undated.subtitle in _flatten(text)
