@@ -437,6 +437,7 @@ def test_the_stylesheet_covers_every_role_the_renderer_uses():
         "entry",
         "date",
         "detail",
+        "detail_right",
         "body",
         "bullet",
     }
@@ -526,7 +527,7 @@ def test_the_date_is_set_against_the_right_margin():
     the date, and the heading column takes everything else.
     """
     stylesheet = build_stylesheet()
-    row = pdf_renderer._heading_row("<b>Northlake</b>", "Jul 2025 \u2013 May 2026", stylesheet)
+    row = pdf_renderer._flush_right_row("<b>Northlake</b>", "Jul 2025 \u2013 May 2026", stylesheet)
 
     assert stylesheet["date"].alignment == TA_RIGHT
     assert sum(row._argW) == pytest.approx(styles.CONTENT_WIDTH)
@@ -534,7 +535,7 @@ def test_the_date_is_set_against_the_right_margin():
 
 def test_a_long_date_cannot_squeeze_the_heading_away(generated_resume):
     """The heading column has a floor, so an absurd date degrades rather than erases."""
-    row = pdf_renderer._heading_row("<b>Northlake</b>", "x" * 400, build_stylesheet())
+    row = pdf_renderer._flush_right_row("<b>Northlake</b>", "x" * 400, build_stylesheet())
 
     assert row._argW[0] >= styles.MIN_HEADING_WIDTH
 
@@ -548,3 +549,23 @@ def test_an_entry_without_a_date_is_not_given_an_empty_column(tmp_path, generate
 
     assert undated.name in _flatten(text)
     assert undated.subtitle in _flatten(text)
+
+
+def test_the_gpa_is_set_against_the_right_margin(extracted, generated_resume):
+    """The second education line carries the GPA the way the first carries the date."""
+    entry = generated_resume.education[0]
+
+    assert f"GPA: {entry.gpa}" in extracted
+    assert entry.field in extracted
+
+
+def test_an_education_entry_without_a_gpa_still_renders_its_qualification(
+    tmp_path, generated_resume
+):
+    without = generated_resume.education[0].model_copy(update={"gpa": None})
+    resume = generated_resume.model_copy(update={"education": (without,)})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "no_gpa.pdf").path))
+
+    assert without.field in text
+    assert "GPA" not in text

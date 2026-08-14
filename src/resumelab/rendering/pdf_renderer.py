@@ -196,16 +196,21 @@ def _education(
     stylesheet: dict[str, ParagraphStyle],
 ) -> Iterable[Flowable]:
     for entry in entries:
-        yield _heading_row(
+        yield _flush_right_row(
             _joined(_bold(entry.institution), entry.location),
             _date_text(entry.start_date, entry.end_date),
             stylesheet,
         )
         qualification = " ".join(part for part in (entry.degree, entry.field) if part)
         gpa = f"GPA: {entry.gpa}" if entry.gpa else ""
-        detail = _joined(qualification, gpa)
-        if detail:
-            yield Paragraph(detail, stylesheet["detail"])
+        if qualification or gpa:
+            yield _flush_right_row(
+                _text(qualification),
+                gpa,
+                stylesheet,
+                leading_style="detail",
+                trailing_style="detail_right",
+            )
 
 
 def _experiences(
@@ -213,7 +218,7 @@ def _experiences(
     stylesheet: dict[str, ParagraphStyle],
 ) -> Iterable[Flowable]:
     for entry in entries:
-        yield _heading_row(
+        yield _flush_right_row(
             _joined(_bold(entry.company), entry.title, entry.location),
             _date_text(entry.start_date, entry.end_date),
             stylesheet,
@@ -228,7 +233,7 @@ def _projects(
 ) -> Iterable[Flowable]:
     for entry in entries:
         heading = f"{_bold(entry.name)} — {_text(entry.subtitle)}"
-        yield _heading_row(heading, entry.date or "", stylesheet)
+        yield _flush_right_row(heading, entry.date or "", stylesheet)
         if entry.technologies:
             yield Paragraph(_text(", ".join(entry.technologies)), stylesheet["detail"])
         for bullet in entry.bullets:
@@ -291,33 +296,37 @@ def _date_text(start: str | None, end: str | None) -> str:
     return start or end or ""
 
 
-def _heading_row(
-    heading: str,
-    date: str,
+def _flush_right_row(
+    leading: str,
+    trailing: str,
     stylesheet: dict[str, ParagraphStyle],
+    *,
+    leading_style: str = "entry",
+    trailing_style: str = "date",
 ) -> Flowable:
-    """Set ``heading`` against ``date``, with the date flush to the right margin.
+    """Set ``leading`` against ``trailing``, with the latter on the right margin.
 
-    The date column is measured to its own content rather than fixed, so the date
-    lands on the margin at every layout scale and the heading keeps everything else.
-    An entry with no date is a plain paragraph — an empty column would still consume
-    its width and pull the heading in for no reason.
+    The right column is measured to its own content rather than fixed, so the trailing
+    field lands on the margin at every layout scale and the left column keeps
+    everything else. With nothing to trail, this is a plain paragraph — an empty
+    column would still consume its width and pull the left side in for no reason.
     """
-    if not date:
-        return Paragraph(heading, stylesheet["entry"])
+    left_style = stylesheet[leading_style]
+    if not trailing:
+        return Paragraph(leading, left_style)
 
-    date_style = stylesheet["date"]
-    date_width = pdfmetrics.stringWidth(date, date_style.fontName, date_style.fontSize)
-    heading_width = max(styles.CONTENT_WIDTH - date_width, styles.MIN_HEADING_WIDTH)
+    right_style = stylesheet[trailing_style]
+    right_width = pdfmetrics.stringWidth(trailing, right_style.fontName, right_style.fontSize)
+    left_width = max(styles.CONTENT_WIDTH - right_width, styles.MIN_HEADING_WIDTH)
 
     row = Table(
-        [[Paragraph(heading, stylesheet["entry"]), Paragraph(_text(date), date_style)]],
-        colWidths=[heading_width, date_width],
+        [[Paragraph(leading, left_style), Paragraph(_text(trailing), right_style)]],
+        colWidths=[left_width, right_width],
         style=styles.heading_row_style(),
     )
-    # A Table is not a Paragraph, so the entry spacing has to be carried over by hand.
-    row.spaceBefore = stylesheet["entry"].spaceBefore
-    row.spaceAfter = stylesheet["entry"].spaceAfter
+    # A Table is not a Paragraph, so the paragraph spacing has to be carried over.
+    row.spaceBefore = left_style.spaceBefore
+    row.spaceAfter = left_style.spaceAfter
     return row
 
 

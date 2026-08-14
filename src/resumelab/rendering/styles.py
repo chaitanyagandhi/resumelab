@@ -270,6 +270,14 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             alignment=TA_RIGHT,
             textColor=MUTED_INK,
         ),
+        "detail_right": style(
+            "detail_right",
+            fontName=FONT_REGULAR,
+            fontSize=detail,
+            leading=_leading(detail),
+            alignment=TA_RIGHT,
+            textColor=MUTED_INK,
+        ),
         "detail": style(
             "detail",
             fontName=FONT_ITALIC,
