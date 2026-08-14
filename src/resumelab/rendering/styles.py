@@ -31,8 +31,17 @@ MARGIN_HORIZONTAL = 0.6 * inch
 MARGIN_TOP = 0.5 * inch
 MARGIN_BOTTOM = 0.5 * inch
 
-CONTENT_WIDTH = PAGE_SIZE[0] - 2 * MARGIN_HORIZONTAL
-"""Width available between the margins, which a right-aligned date is measured against."""
+FRAME_PADDING = 6.0
+"""ReportLab's frame padding, applied inside the page margin on every side.
+
+``SimpleDocTemplate`` builds its frame with this padding, so text begins this far
+inside the margin. Paragraphs pick it up for free because they are laid out *by* the
+frame. A table is different: it is given an explicit width, so the padding has to be
+subtracted here or the row hangs outside the section rules everything else aligns to.
+"""
+
+CONTENT_WIDTH = PAGE_SIZE[0] - 2 * MARGIN_HORIZONTAL - 2 * FRAME_PADDING
+"""Width text actually occupies, which a right-aligned field is measured against."""
 
 MIN_HEADING_WIDTH = 1.5 * inch
 """Floor for the heading column, so an absurd date cannot squeeze the title away."""

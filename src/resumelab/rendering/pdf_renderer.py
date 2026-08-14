@@ -323,6 +323,9 @@ def _flush_right_row(
         [[Paragraph(leading, left_style), Paragraph(_text(trailing), right_style)]],
         colWidths=[left_width, right_width],
         style=styles.heading_row_style(),
+        # A Table defaults to centring itself in the frame. Left is what makes the row
+        # start on the same margin as every paragraph and section rule around it.
+        hAlign="LEFT",
     )
     # A Table is not a Paragraph, so the paragraph spacing has to be carried over.
     row.spaceBefore = left_style.spaceBefore

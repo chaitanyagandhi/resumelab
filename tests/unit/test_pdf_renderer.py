@@ -569,3 +569,38 @@ def test_an_education_entry_without_a_gpa_still_renders_its_qualification(
 
     assert without.field in text
     assert "GPA" not in text
+
+
+def test_the_content_width_matches_the_frame_the_document_actually_uses():
+    """Entry rows align to the section rules only if this width is right.
+
+    Paragraphs are laid out by the frame and inherit its padding for free. A table is
+    given an explicit width, so the padding has to be subtracted by hand — and getting
+    it wrong is invisible to every test that only reads the text back.
+    """
+    import io
+
+    from reportlab.platypus import SimpleDocTemplate
+    from reportlab.platypus.frames import Frame
+
+    document = SimpleDocTemplate(
+        io.BytesIO(),
+        pagesize=styles.PAGE_SIZE,
+        leftMargin=styles.MARGIN_HORIZONTAL,
+        rightMargin=styles.MARGIN_HORIZONTAL,
+        topMargin=styles.MARGIN_TOP,
+        bottomMargin=styles.MARGIN_BOTTOM,
+    )
+    frame = Frame(document.leftMargin, document.bottomMargin, document.width, document.height)
+
+    assert (
+        pytest.approx(frame._width - frame._leftPadding - frame._rightPadding)
+        == styles.CONTENT_WIDTH
+    )
+
+
+def test_an_entry_row_starts_on_the_left_margin():
+    """A Table centres itself by default, which hangs the row out on both sides."""
+    row = pdf_renderer._flush_right_row("<b>Northlake</b>", "Jun 2026", build_stylesheet())
+
+    assert row.hAlign == "LEFT"
