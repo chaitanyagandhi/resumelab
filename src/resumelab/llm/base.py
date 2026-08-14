@@ -30,6 +30,13 @@ BACKOFF_BASE_SECONDS = 1.0
 MAX_BACKOFF_SECONDS = 30.0
 """Ceiling on a single wait, so a long retry budget cannot stall a run."""
 
+MAX_REJECTED_VALUE_CHARACTERS = 4000
+"""Cap on how much of a rejected value is quoted back to the model.
+
+Generous, because the whole point is to hand back the text being edited, but bounded
+so a runaway response cannot grow the next request without limit.
+"""
+
 
 class MalformedResponseError(Exception):
     """Internal signal that a response was structurally unusable and may be repaired."""
@@ -107,7 +114,7 @@ class RetryingLLMClient(ABC):
                     self._backoff(attempt)
             except ValidationError as exc:
                 failure = describe_validation_error(exc, "response did not match the schema:")
-                repair_hint = _repair_prompt(failure)
+                repair_hint = _validation_repair_prompt(exc)
                 logger.warning(
                     "llm response failed validation purpose=%s attempt=%d/%d errors=%d",
                     purpose,
@@ -174,10 +181,58 @@ class RetryingLLMClient(ABC):
 
 
 def _repair_prompt(failure: str) -> str:
-    """Ask the model to fix a response that failed validation."""
+    """Ask the model to fix a response that was structurally unusable.
+
+    Used when there is nothing to quote back — the response could not be parsed at
+    all, so there is no rejected value to show.
+    """
     return (
         "Your previous response was rejected because it "
         f"{failure}\n"
         "Return a corrected response that satisfies the required schema exactly. "
         "Do not explain the correction."
     )
+
+
+def _validation_repair_prompt(exc: ValidationError) -> str:
+    """Ask the model to correct a response, quoting what it actually returned.
+
+    Naming the broken rule is not enough on its own. Told only "must be at most 300
+    characters, got 308", a model writes a *new* summary of about the same length and
+    the run burns its whole retry budget landing in the same place — which is exactly
+    how runs were failing. Shown the text it wrote, the task becomes editing, and one
+    attempt usually does it.
+
+    This is the only place a rejected value is quoted, and it goes to the model that
+    just produced it rather than to a log or the CLI. That is why
+    :func:`describe_validation_error` still omits values: those messages are seen by
+    people and end up in files.
+    """
+    lines: list[str] = []
+    for error in exc.errors():
+        location = ".".join(str(part) for part in error["loc"]) if error["loc"] else "<root>"
+        lines.append(f"- {location}: {error['msg']}")
+        rejected = _render_rejected(error.get("input"))
+        if rejected:
+            lines.append(f"  you returned: {rejected}")
+
+    return (
+        "Your previous response was rejected. Fix exactly these problems:\n"
+        + "\n".join(lines)
+        + "\nEdit what you wrote so it satisfies every rule, keeping the content and "
+        "meaning. Do not start over, and do not explain the correction."
+    )
+
+
+def _render_rejected(value: object) -> str:
+    """Render a rejected value for the model, bounded so a repair cannot bloat.
+
+    Truncated rather than dropped when long: a model editing the first part of an
+    over-long list still gets the correction it needs.
+    """
+    if value is None:
+        return ""
+    text = value if isinstance(value, str) else repr(value)
+    if len(text) > MAX_REJECTED_VALUE_CHARACTERS:
+        return f"{text[:MAX_REJECTED_VALUE_CHARACTERS]}… (truncated)"
+    return text

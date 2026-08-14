@@ -399,7 +399,23 @@ def test_a_schema_failure_is_retried_with_the_errors_appended(build_client):
     repair = messages[-1]["content"]
     assert [message["role"] for message in messages] == ["system", "user", "user"]
     assert "verdict" in repair
-    assert "corrected response" in repair
+    assert "Input should be a valid string" in repair
+
+
+def test_the_repair_quotes_back_what_the_model_actually_returned(build_client):
+    """Naming the broken rule is not enough.
+
+    Told only that a value was too long, a model writes a new one of about the same
+    length and the retry budget goes on landing in the same place. Shown what it
+    wrote, the task becomes an edit.
+    """
+    client, stub = build_client([validation_error(), completion(parsed=Answer(verdict="ok"))])
+
+    generate(client)
+
+    repair = stub.completions.calls[1]["messages"][-1]["content"]
+    assert "you returned: 123" in repair
+    assert "Do not start over" in repair
 
 
 def test_schema_repair_does_not_wait_between_attempts(build_client, sleeps):

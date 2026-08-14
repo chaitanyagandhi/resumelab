@@ -11,11 +11,15 @@ import logging
 from pathlib import Path
 
 import pytest
+from pydantic import ValidationError
 
 from resumelab.exceptions import ResumeLabError, UnsafePathError
+from resumelab.llm import base
 from resumelab.llm.prompts import injection_markers
 from resumelab.loaders import load_job_description
 from resumelab.models.job import MAX_JOB_DESCRIPTION_CHARACTERS, MIN_JOB_DESCRIPTION_CHARACTERS
+from resumelab.models.resume import GeneratedSummary
+from resumelab.utils.errors import describe_validation_error
 from resumelab.utils.paths import ensure_within, prepare_output_file
 from resumelab.utils.text import control_characters, normalize_text, slugify
 
@@ -238,3 +242,57 @@ def test_an_over_long_label_is_cut_back_to_a_word_boundary():
 def test_a_single_over_long_word_is_cut_where_it_must_be():
     """With no late word boundary, a ragged edge beats throwing the name away."""
     assert slugify("x" * 200) == "x" * 40
+
+
+# --- repairing a rejected response ----------------------------------------
+
+
+def _too_long_error(text: str) -> ValidationError:
+    """A realistic near-miss: the failure mode that was exhausting retry budgets."""
+    try:
+        GeneratedSummary(summary=text)
+    except ValidationError as exc:
+        return exc
+    raise AssertionError("expected the summary to be rejected")
+
+
+def test_a_repair_shows_the_model_the_text_it_wrote():
+    """Without this the model rewrites from scratch and misses by the same margin."""
+    overlong = "Storage infrastructure engineer who builds distributed systems. " * 6
+
+    prompt = base._validation_repair_prompt(_too_long_error(overlong))
+
+    assert overlong[:100] in prompt
+    assert "at most 300 characters" in prompt
+
+
+def test_a_rejected_value_never_reaches_the_message_a_person_sees():
+    """The repair prompt goes to the model; this one goes to logs and the CLI."""
+    secret_ish = "Storage engineer at Northlake reachable on 555-0100. " * 6
+
+    reported = describe_validation_error(_too_long_error(secret_ish), "response failed:")
+
+    assert secret_ish not in reported
+    assert "555-0100" not in reported
+    assert "at most 300 characters" in reported
+
+
+def test_an_enormous_rejected_value_is_truncated():
+    """A runaway response must not grow the next request without limit."""
+    prompt = base._validation_repair_prompt(_too_long_error("x" * 50_000))
+
+    assert "truncated" in prompt
+    assert len(prompt) < base.MAX_REJECTED_VALUE_CHARACTERS + 1000
+
+
+def test_an_error_with_no_value_to_quote_still_reports_the_rule():
+    """A field rejected for being absent has nothing to hand back."""
+    try:
+        GeneratedSummary(summary=None)
+    except ValidationError as exc:
+        prompt = base._validation_repair_prompt(exc)
+    else:
+        raise AssertionError("expected the summary to be rejected")
+
+    assert "summary" in prompt
+    assert "you returned:" not in prompt
