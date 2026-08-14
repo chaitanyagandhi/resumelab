@@ -641,3 +641,38 @@ def test_shortening_a_profile_link_does_not_break_it(tmp_path, generated_resume)
     assert full in targets
     assert _flatten(_text_of(rendered)).count("https://www.linkedin.com") == 0
     assert "linkedin.com/in/cg10" in _flatten(_text_of(rendered))
+
+
+def test_the_experience_location_is_set_on_the_right(extracted, generated_resume):
+    """Location moves to the right-hand column, under the dates."""
+    entry = generated_resume.experiences[0]
+
+    company = extracted.index(entry.company)
+    dates = extracted.index(entry.start_date, company)
+    title = extracted.index(entry.title, company)
+    location = extracted.index(entry.location, company)
+
+    assert company < dates < title < location < extracted.index(entry.bullets[0], company)
+
+
+def test_an_experience_without_a_location_still_shows_its_title(tmp_path, generated_resume):
+    entry = generated_resume.experiences[0].model_copy(update={"location": None})
+    resume = generated_resume.model_copy(update={"experiences": (entry,)})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "no_location.pdf").path))
+
+    assert entry.title in text
+    assert entry.company in text
+
+
+def test_an_experience_with_neither_title_nor_location_skips_the_second_line(
+    tmp_path, generated_resume
+):
+    """No content means no row: an empty line would just be a gap above the bullets."""
+    entry = generated_resume.experiences[0].model_copy(update={"title": "", "location": None})
+    resume = generated_resume.model_copy(update={"experiences": (entry,)})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "bare.pdf").path))
+
+    assert entry.company in text
+    assert entry.bullets[0] in text

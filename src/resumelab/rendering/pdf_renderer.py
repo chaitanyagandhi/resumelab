@@ -220,11 +220,22 @@ def _experiences(
     stylesheet: dict[str, ParagraphStyle],
 ) -> Iterable[Flowable]:
     for entry in entries:
+        # Laid out as education is: the anchor and its dates, then the qualifying
+        # detail and its own right-hand field. The title moves down with the location
+        # rather than leaving that line half empty.
         yield _flush_right_row(
-            _joined(_bold(entry.company), entry.title, entry.location),
+            _bold(entry.company),
             _date_text(entry.start_date, entry.end_date),
             stylesheet,
         )
+        if entry.title or entry.location:
+            yield _flush_right_row(
+                _text(entry.title),
+                entry.location or "",
+                stylesheet,
+                leading_style="detail",
+                trailing_style="detail_right",
+            )
         for bullet in entry.bullets:
             yield _bullet(bullet, stylesheet)
 
