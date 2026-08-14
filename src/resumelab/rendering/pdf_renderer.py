@@ -185,8 +185,10 @@ def _contact_line(personal: PersonalDetails) -> str:
         _text(personal.location) if personal.location else "",
         _link(f"mailto:{personal.email}", personal.email) if personal.email else "",
         _text(personal.phone) if personal.phone else "",
-        _link(_url(personal.linkedin), personal.linkedin) if personal.linkedin else "",
-        _link(_url(personal.github), personal.github) if personal.github else "",
+        _link(_url(personal.linkedin), _profile_label(personal.linkedin))
+        if personal.linkedin
+        else "",
+        _link(_url(personal.github), _profile_label(personal.github)) if personal.github else "",
     ]
     return styles.SEPARATOR.join(part for part in parts if part)
 
@@ -344,6 +346,20 @@ def _link(href: str, label: str) -> str:
 def _url(value: str) -> str:
     """Make a profile reference clickable without assuming it carries a scheme."""
     return value if value.startswith(("http://", "https://")) else f"https://{value}"
+
+
+def _profile_label(value: str) -> str:
+    """Shorten a profile reference to the part worth reading.
+
+    ``https://www.linkedin.com/in/cg10/`` becomes ``linkedin.com/in/cg10``. The
+    scheme, the ``www.``, and a trailing slash are noise on a contact line: nobody
+    types them, and on a one-page resume they cost room that the address itself
+    needs. The link still points at the full URL, so the shortening is display only.
+    """
+    label = value.strip()
+    for scheme in ("https://", "http://"):
+        label = label.removeprefix(scheme)
+    return label.removeprefix("www.").rstrip("/")
 
 
 def _text(value: str) -> str:

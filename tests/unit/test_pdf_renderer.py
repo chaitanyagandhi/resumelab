@@ -604,3 +604,40 @@ def test_an_entry_row_starts_on_the_left_margin():
     row = pdf_renderer._flush_right_row("<b>Northlake</b>", "Jun 2026", build_stylesheet())
 
     assert row.hAlign == "LEFT"
+
+
+# --- profile links --------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("stored", "shown"),
+    [
+        ("https://www.linkedin.com/in/cg10/", "linkedin.com/in/cg10"),
+        ("http://linkedin.com/in/cg10", "linkedin.com/in/cg10"),
+        ("https://github.com/chaitanyagandhi", "github.com/chaitanyagandhi"),
+        ("www.github.com/ada/", "github.com/ada"),
+        ("github.com/ada", "github.com/ada"),
+    ],
+)
+def test_a_profile_link_is_shown_without_its_scheme(stored, shown):
+    """Nobody types the scheme, and on one page it costs room the address needs."""
+    assert pdf_renderer._profile_label(stored) == shown
+
+
+def test_shortening_a_profile_link_does_not_break_it(tmp_path, generated_resume):
+    """The label is shortened; the link still has to resolve."""
+    full = "https://www.linkedin.com/in/cg10/"
+    personal = generated_resume.personal.model_copy(update={"linkedin": full})
+    resume = generated_resume.model_copy(update={"personal": personal})
+
+    rendered = render_resume(resume, tmp_path / "links.pdf").path
+    annotations = [
+        annotation.get_object()
+        for page in PdfReader(rendered).pages
+        for annotation in page.get("/Annots", [])
+    ]
+    targets = [str(entry["/A"]["/URI"]) for entry in annotations if "/A" in entry]
+
+    assert full in targets
+    assert _flatten(_text_of(rendered)).count("https://www.linkedin.com") == 0
+    assert "linkedin.com/in/cg10" in _flatten(_text_of(rendered))
