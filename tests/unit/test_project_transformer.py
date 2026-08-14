@@ -96,7 +96,7 @@ def test_a_project_needs_more_than_one_technology():
 def test_an_overstuffed_technology_list_is_rejected():
     too_many = tuple(f"Tech{index}" for index in range(MAX_PROJECT_TECHNOLOGIES + 1))
 
-    with pytest.raises(ValidationError, match="at most 10 technologies"):
+    with pytest.raises(ValidationError, match="at most 5 technologies"):
         content(technologies=too_many)
 
 

@@ -676,3 +676,20 @@ def test_an_experience_with_neither_title_nor_location_skips_the_second_line(
 
     assert entry.company in text
     assert entry.bullets[0] in text
+
+
+def test_project_technologies_sit_on_the_title_line(extracted, generated_resume):
+    """The stack qualifies the subtitle; a line of its own spends a line saying so."""
+    project = generated_resume.projects[0]
+
+    assert f"{project.subtitle} • {', '.join(project.technologies)}" in extracted
+
+
+def test_a_project_without_technologies_still_renders_its_heading(tmp_path, generated_resume):
+    bare = generated_resume.projects[0].model_copy(update={"technologies": ()})
+    resume = generated_resume.model_copy(update={"projects": (bare,)})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "no_tech.pdf").path))
+
+    assert bare.name in text
+    assert bare.subtitle in text

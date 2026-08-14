@@ -32,8 +32,12 @@ MAX_SUBTITLE_CHARACTERS = 90
 MIN_PROJECT_TECHNOLOGIES = 2
 """A project presented as using one technology reads as unfinished."""
 
-MAX_PROJECT_TECHNOLOGIES = 10
-"""Beyond this the list stops being read and starts looking padded."""
+MAX_PROJECT_TECHNOLOGIES = 5
+"""Beyond this the list stops being read and starts looking padded.
+
+It also has to share the title line with the project name and subtitle, so the cap is
+what keeps that line from wrapping.
+"""
 
 MIN_SKILL_COUNT = 10
 """Below this the section reads as a thin candidate rather than a focused one."""
