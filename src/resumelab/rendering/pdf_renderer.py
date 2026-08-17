@@ -21,7 +21,7 @@ from __future__ import annotations
 
 import io
 import logging
-from collections.abc import Iterable
+from collections.abc import Callable, Iterable
 from dataclasses import dataclass
 from pathlib import Path
 from xml.sax.saxutils import escape
@@ -39,6 +39,7 @@ from resumelab.models.resume import (
     GeneratedResume,
 )
 from resumelab.rendering import styles
+from resumelab.rendering.options import DEFAULT_RENDER_OPTIONS, RenderOptions, ResumeSection
 
 logger = logging.getLogger(__name__)
 
@@ -62,7 +63,12 @@ class RenderResult:
         return self.scale < 1.0
 
 
-def render_resume(resume: GeneratedResume, output_path: Path) -> RenderResult:
+def render_resume(
+    resume: GeneratedResume,
+    output_path: Path,
+    *,
+    options: RenderOptions | None = None,
+) -> RenderResult:
     """Render ``resume`` to a PDF at ``output_path``, fitting one page if it can.
 
     Progressively tighter layouts are tried until the content fits a single page.
@@ -77,6 +83,8 @@ def render_resume(resume: GeneratedResume, output_path: Path) -> RenderResult:
     Args:
         resume: The validated resume to draw.
         output_path: Where to write the PDF. Parent directories are created.
+        options: What to show and in what order. Defaults to everything, in the
+            default order, which is what the pipeline renders.
 
     Returns:
         A :class:`RenderResult` describing the layout that was used.
@@ -84,12 +92,13 @@ def render_resume(resume: GeneratedResume, output_path: Path) -> RenderResult:
     Raises:
         PDFRenderingError: If the document could not be built or written.
     """
+    chosen = options if options is not None else DEFAULT_RENDER_OPTIONS
     logger.info("rendering PDF output=%s", output_path)
 
     payload, page_count, scale = b"", 0, styles.LAYOUT_SCALES[0]
     for candidate in styles.LAYOUT_SCALES:
         scale = candidate
-        payload, page_count = _build_document(resume, candidate)
+        payload, page_count = _build_document(resume, candidate, chosen)
         if page_count == 1:
             break
         logger.debug("layout overflowed pages=%d scale=%.3f", page_count, candidate)
@@ -115,7 +124,11 @@ def render_resume(resume: GeneratedResume, output_path: Path) -> RenderResult:
     return RenderResult(path=output_path, scale=scale, page_count=page_count)
 
 
-def _build_document(resume: GeneratedResume, scale: float) -> tuple[bytes, int]:
+def _build_document(
+    resume: GeneratedResume,
+    scale: float,
+    options: RenderOptions,
+) -> tuple[bytes, int]:
     """Build the document in memory at ``scale``, returning its bytes and page count."""
     buffer = io.BytesIO()
     document = SimpleDocTemplate(
@@ -130,7 +143,7 @@ def _build_document(resume: GeneratedResume, scale: float) -> tuple[bytes, int]:
         author=resume.personal.name,
     )
     try:
-        document.build(list(_build_story(resume, styles.build_stylesheet(scale))))
+        document.build(list(_build_story(resume, styles.build_stylesheet(scale), options)))
     except LayoutError as exc:
         raise PDFRenderingError(
             f"The resume could not be laid out at scale {scale}: {exc}"
@@ -149,24 +162,76 @@ def _write(payload: bytes, output_path: Path) -> None:
 def _build_story(
     resume: GeneratedResume,
     stylesheet: dict[str, ParagraphStyle],
+    options: RenderOptions,
 ) -> Iterable[Flowable]:
-    """Produce the flowables for the whole document, in reading order."""
+    """Produce the flowables for the whole document, in reading order.
+
+    The header opens the document and the achievements close it, with the summary
+    directly beneath the name where it is read or skipped in one glance. Between them
+    the four body sections are drawn in whatever order was asked for; the dispatch is
+    a lookup rather than a branch so that no order is a special case.
+    """
     yield from _header(resume.personal, stylesheet)
-    yield from _section(
-        "Summary", [Paragraph(_text(resume.summary), stylesheet["body"])], stylesheet
-    )
-    yield from _section("Education", list(_education(resume.education, stylesheet)), stylesheet)
-    yield from _section(
-        "Experience", list(_experiences(resume.experiences, stylesheet)), stylesheet
-    )
-    yield from _section("Projects", list(_projects(resume.projects, stylesheet)), stylesheet)
-    yield from _section("Skills", list(_skills(resume.skills, stylesheet)), stylesheet)
+    if options.include_summary:
+        yield from _section(
+            "Summary", [Paragraph(_text(resume.summary), stylesheet["body"])], stylesheet
+        )
+    for section in options.section_order:
+        yield from _SECTION_BUILDERS[section](resume, stylesheet, options)
     if resume.achievements:
         yield from _section(
             "Achievements",
             [_bullet(text, stylesheet) for text in resume.achievements],
             stylesheet,
         )
+
+
+def _education_section(
+    resume: GeneratedResume,
+    stylesheet: dict[str, ParagraphStyle],
+    options: RenderOptions,
+) -> Iterable[Flowable]:
+    body = list(_education(resume.education, stylesheet, include_gpa=options.include_gpa))
+    yield from _section("Education", body, stylesheet)
+
+
+def _experience_section(
+    resume: GeneratedResume,
+    stylesheet: dict[str, ParagraphStyle],
+    _options: RenderOptions,
+) -> Iterable[Flowable]:
+    yield from _section(
+        "Experience", list(_experiences(resume.experiences, stylesheet)), stylesheet
+    )
+
+
+def _projects_section(
+    resume: GeneratedResume,
+    stylesheet: dict[str, ParagraphStyle],
+    _options: RenderOptions,
+) -> Iterable[Flowable]:
+    yield from _section("Projects", list(_projects(resume.projects, stylesheet)), stylesheet)
+
+
+def _skills_section(
+    resume: GeneratedResume,
+    stylesheet: dict[str, ParagraphStyle],
+    _options: RenderOptions,
+) -> Iterable[Flowable]:
+    yield from _section("Skills", list(_skills(resume.skills, stylesheet)), stylesheet)
+
+
+_SectionBuilder = Callable[
+    [GeneratedResume, dict[str, ParagraphStyle], RenderOptions], Iterable[Flowable]
+]
+
+_SECTION_BUILDERS: dict[ResumeSection, _SectionBuilder] = {
+    ResumeSection.EDUCATION: _education_section,
+    ResumeSection.EXPERIENCE: _experience_section,
+    ResumeSection.PROJECTS: _projects_section,
+    ResumeSection.SKILLS: _skills_section,
+}
+"""Every section has an entry, which is what makes the order above total."""
 
 
 def _header(
@@ -197,6 +262,8 @@ def _contact_line(personal: PersonalDetails) -> str:
 def _education(
     entries: Iterable[Education],
     stylesheet: dict[str, ParagraphStyle],
+    *,
+    include_gpa: bool,
 ) -> Iterable[Flowable]:
     for entry in entries:
         yield _flush_right_row(
@@ -205,7 +272,9 @@ def _education(
             stylesheet,
         )
         qualification = " ".join(part for part in (entry.degree, entry.field) if part)
-        gpa = f"GPA: {entry.gpa}" if entry.gpa else ""
+        # Withheld and absent are the same thing on the page: the qualification line
+        # is set without a right-hand column rather than with an empty one.
+        gpa = f"GPA: {entry.gpa}" if include_gpa and entry.gpa else ""
         if qualification or gpa:
             yield _flush_right_row(
                 _text(qualification),

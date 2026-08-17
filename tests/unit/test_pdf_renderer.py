@@ -13,7 +13,7 @@ from reportlab.lib.enums import TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
 
 from resumelab.exceptions import PDFRenderingError, ResumeLabError
-from resumelab.rendering import pdf_renderer, render_resume, styles
+from resumelab.rendering import RenderOptions, ResumeSection, pdf_renderer, render_resume, styles
 from resumelab.rendering.styles import (
     LAYOUT_SCALES,
     MIN_BODY_FONT_SIZE,
@@ -699,3 +699,91 @@ def test_a_project_without_technologies_still_renders_its_heading(tmp_path, gene
 
     assert bare.name in text
     assert bare.subtitle in text
+
+
+# --- what is shown, and where ---------------------------------------------
+
+
+def test_the_default_options_draw_the_same_document_as_no_options(tmp_path, generated_resume):
+    """The defaults are the pipeline's layout; passing them explicitly changes nothing."""
+    implicit = render_resume(generated_resume, tmp_path / "implicit.pdf")
+    explicit = render_resume(generated_resume, tmp_path / "explicit.pdf", options=RenderOptions())
+
+    assert _text_of(implicit.path) == _text_of(explicit.path)
+
+
+def test_sections_are_drawn_in_the_order_asked_for(tmp_path, generated_resume):
+    order = (
+        ResumeSection.SKILLS,
+        ResumeSection.PROJECTS,
+        ResumeSection.EXPERIENCE,
+        ResumeSection.EDUCATION,
+    )
+
+    text = _text_of(
+        render_resume(
+            generated_resume, tmp_path / "reordered.pdf", options=RenderOptions(section_order=order)
+        ).path
+    )
+
+    assert _heading_order(text) == ["SKILLS", "PROJECTS", "EXPERIENCE", "EDUCATION"]
+
+
+def test_the_default_order_puts_education_first(extracted):
+    assert _heading_order(extracted) == ["EDUCATION", "EXPERIENCE", "PROJECTS", "SKILLS"]
+
+
+def test_reordering_moves_the_content_with_its_heading(tmp_path, generated_resume):
+    """A heading that moved without its body would be the worst possible outcome here."""
+    order = (
+        ResumeSection.SKILLS,
+        ResumeSection.EDUCATION,
+        ResumeSection.EXPERIENCE,
+        ResumeSection.PROJECTS,
+    )
+
+    text = _text_of(
+        render_resume(
+            generated_resume,
+            tmp_path / "skills_first.pdf",
+            options=RenderOptions(section_order=order),
+        ).path
+    )
+
+    assert text.index(generated_resume.skills[0]) < text.index("EDUCATION")
+
+
+def test_withholding_the_summary_removes_its_heading_too(tmp_path, generated_resume):
+    text = _text_of(
+        render_resume(
+            generated_resume,
+            tmp_path / "no_summary.pdf",
+            options=RenderOptions(include_summary=False),
+        ).path
+    )
+
+    assert generated_resume.summary not in text
+    assert "SUMMARY" not in text
+    assert generated_resume.personal.name in text
+
+
+def test_withholding_the_gpa_keeps_the_qualification(tmp_path, generated_resume):
+    entry = generated_resume.education[0]
+
+    text = _text_of(
+        render_resume(
+            generated_resume,
+            tmp_path / "no_gpa_shown.pdf",
+            options=RenderOptions(include_gpa=False),
+        ).path
+    )
+
+    assert "GPA" not in text
+    assert entry.field in text
+    assert entry.institution in text
+
+
+def _heading_order(text: str) -> list[str]:
+    """The body section headings, in the order they appear on the page."""
+    headings = ("EDUCATION", "EXPERIENCE", "PROJECTS", "SKILLS")
+    return sorted(headings, key=text.index)
