@@ -406,8 +406,12 @@ def test_the_static_directory_ships_with_the_package():
 
 
 def test_the_page_loads_only_local_assets():
-    """A local research tool that phoned out for a font or a CDN would be worse."""
+    """A local research tool that phoned out for a font or a CDN would be worse.
+
+    Written against the attributes that fetch rather than the text, so an example
+    posting link in a placeholder is not mistaken for a resource.
+    """
     markup = INDEX_FILE.read_text(encoding="utf-8")
 
-    assert "http://" not in markup
-    assert "https://" not in markup
+    assert 'src="http' not in markup
+    assert 'href="http' not in markup

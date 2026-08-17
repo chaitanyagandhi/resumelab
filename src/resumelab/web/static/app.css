@@ -16,7 +16,6 @@
   --line-strong: #d4d4d8;
   --accent: #18181b;
   --ok: #16a34a;
-  --warn: #d97706;
   --bad: #dc2626;
 
   --radius: 10px;
@@ -27,6 +26,13 @@
 
 * {
   box-sizing: border-box;
+}
+
+/* Any rule setting `display` outranks the user agent's `[hidden]`, so an element
+ * the page hid would come back the moment it was given a display of its own. This
+ * is what keeps `hidden` meaning hidden. */
+[hidden] {
+  display: none !important;
 }
 
 body {
@@ -91,10 +97,204 @@ body {
 
 .panel--preview {
   padding: 12px;
-  min-height: 60vh;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  /* Tall enough that a rendered page is readable without scrolling the window. */
+  min-height: 78vh;
+}
+
+/* --- the form ---------------------------------------------------------- */
+
+.field {
+  display: block;
+  margin-bottom: 14px;
+}
+
+.field__label {
+  display: block;
+  margin-bottom: 5px;
+  font-size: 12px;
+  font-weight: 550;
+  color: var(--ink-muted);
+}
+
+input,
+textarea,
+select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+}
+
+textarea {
+  resize: vertical;
+  line-height: 1.45;
+}
+
+input:focus-visible,
+textarea:focus-visible,
+select:focus-visible,
+button:focus-visible,
+a.button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.paste {
+  margin-bottom: 14px;
+}
+
+.paste summary {
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--ink-muted);
+  margin-bottom: 8px;
+}
+
+.button {
+  display: inline-block;
+  padding: 9px 14px;
+  border: 1px solid var(--line-strong);
+  border-radius: 8px;
+  background: var(--card);
+  color: var(--ink);
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  text-decoration: none;
+  text-align: center;
+  cursor: pointer;
+}
+
+.button:hover {
+  border-color: var(--ink-faint);
+}
+
+.button--primary {
+  width: 100%;
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.button--primary:hover {
+  opacity: 0.9;
+}
+
+.button:disabled {
+  cursor: progress;
+  opacity: 0.6;
+}
+
+.note {
+  margin: 8px 0 0;
+  font-size: 11.5px;
+  color: var(--ink-faint);
+}
+
+/* --- progress ---------------------------------------------------------- */
+
+.stages {
+  margin: 16px 0 0;
+  padding: 12px 0 0;
+  border-top: 1px solid var(--line);
+  list-style: none;
+}
+
+.stages__item {
+  position: relative;
+  padding: 3px 0 3px 20px;
+  font-size: 12.5px;
+  color: var(--ink-faint);
+}
+
+.stages__item::before {
+  content: "";
+  position: absolute;
+  left: 4px;
+  top: 9px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--line-strong);
+}
+
+.stages__item[data-state="done"] {
+  color: var(--ink-muted);
+}
+
+.stages__item[data-state="done"]::before {
+  background: var(--ok);
+}
+
+.stages__item[data-state="current"] {
+  color: var(--ink);
+  font-weight: 550;
+}
+
+.stages__item[data-state="current"]::before {
+  background: var(--accent);
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.25;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stages__item[data-state="current"]::before {
+    animation: none;
+  }
+}
+
+.alert {
+  margin: 14px 0 0;
+  padding: 9px 11px;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  background: #fef2f2;
+  color: #991b1b;
+  font-size: 12.5px;
+}
+
+/* --- the preview ------------------------------------------------------- */
+
+.previewbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 32px;
+}
+
+.previewbar__run {
+  font-size: 12px;
+  color: var(--ink-faint);
+  font-variant-numeric: tabular-nums;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.preview {
+  flex: 1;
+  width: 100%;
+  min-height: 70vh;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--page);
 }
 
 .placeholder {
+  flex: 1;
   display: grid;
   place-items: center;
   min-height: 180px;

@@ -85,11 +85,16 @@ resumelab generate --jd-url https://job-boards.greenhouse.io/acme/jobs/8077887
 resumelab generate --jd examples/sample_jd.txt --provider anthropic
 ```
 
+# Review generated resumes in a browser
+resumelab ui
+```
+
 Or via make:
 
 ```bash
 make analyze  JD=examples/sample_jd.txt
 make generate JD=examples/sample_jd.txt
+make ui
 ```
 
 | Flag | Applies to | Meaning |
@@ -142,6 +147,45 @@ in every prompt, and scanned for instruction-like content, which is logged.
 
 ---
 
+## The review UI
+
+`resumelab ui` serves a local page for generating from a posting link and reading the
+result next to the controls that shaped it. It drives the same pipeline as the CLI;
+there is no second code path.
+
+```bash
+resumelab ui                      # http://127.0.0.1:8000
+resumelab ui --port 9000
+make ui PORT=9000
+```
+
+A run takes a minute or more, so the page starts it and then polls: the server hands
+back a job identifier and reports which stage the run has reached. The run outlives
+the request that started it, so a reloaded tab loses the page's state but not the
+run — which matters, because the run is still spending tokens.
+
+**Edits never overwrite what the model wrote.** `generated_resume.json` and
+`resume.pdf` are the research record. Hand edits are re-rendered through the same
+ReportLab code and saved beside them as `edited_resume.json` and
+`edited_resume.pdf`, so a run directory always says which is which. Re-rendering
+never calls a model, and an edited resume is never condensed: a long page is
+reported to whoever is typing rather than fixed behind them.
+
+**It is a local tool.** No authentication, no sessions, no multi-user state — there
+is one candidate profile and one API budget, both belonging to whoever started the
+server. It binds to the loopback interface for that reason; `--host` will expose it,
+and nothing will ask who is on the other end.
+
+| Route | |
+|---|---|
+| `POST /api/generate` | Start a run from `{url}` or `{text}`, optionally naming a provider |
+| `GET /api/jobs/{id}` | How that run is going, and the run it produced |
+| `GET /api/runs/{id}/resume` · `/resume.pdf` | What the model wrote |
+| `PUT /api/runs/{id}/edit` | Re-render edited content |
+| `GET /api/runs/{id}/edit` · `/edit.pdf` | The edited version |
+
+---
+
 ## Architecture
 
 ```
@@ -166,6 +210,7 @@ job description ─────────────┘                      
 | `validation/` | Deterministic pre-render checks over the finished resume |
 | `rendering/` | ReportLab layout, with every measurement in `styles.py` |
 | `experiment/` | Per-run directories and metadata |
+| `web/` | The local review UI: routes, in-flight runs, and hand edits |
 
 Three structural rules hold throughout:
 
@@ -317,6 +362,8 @@ reading order, with every bullet intact.
 
 - **Single candidate, single profile.** No upload, parsing, database, or multi-user
   support; the profile is a file you edit.
+- **The review UI is local and unauthenticated.** In-flight runs are held in memory
+  and do not survive a restart; the run directory on disk is the durable record.
 - **No evaluation metrics yet.** The artifacts support transformation-magnitude,
   keyword-coverage, and unsupported-claim measurement, but none of that is implemented.
 - **No batch mode.** One posting per invocation.

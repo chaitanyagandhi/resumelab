@@ -21,11 +21,58 @@
 
     <main class="workspace">
       <section class="panel panel--controls" aria-label="Generation settings">
-        <div class="placeholder" data-region="controls">Controls load here.</div>
+        <form data-role="generate-form" novalidate>
+          <label class="field">
+            <span class="field__label">Job posting link</span>
+            <input
+              type="url"
+              data-role="url"
+              placeholder="https://job-boards.greenhouse.io/acme/jobs/8077887"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </label>
+
+          <details class="paste">
+            <summary>Or paste the posting instead</summary>
+            <textarea
+              data-role="text"
+              rows="7"
+              placeholder="Paste the job description here. Use this for postings behind bot protection, such as Indeed and LinkedIn."
+            ></textarea>
+          </details>
+
+          <label class="field">
+            <span class="field__label">Provider</span>
+            <select data-role="provider">
+              <option value="">Configured default</option>
+              <option value="openai">OpenAI</option>
+              <option value="anthropic">Anthropic</option>
+            </select>
+          </label>
+
+          <button type="submit" class="button button--primary" data-role="generate">
+            Generate resume
+          </button>
+          <p class="note">
+            Every generation is a real run: it calls the provider, spends tokens, and
+            writes a run directory.
+          </p>
+        </form>
+
+        <ol class="stages" data-role="stages" hidden></ol>
+        <p class="alert" data-role="error" role="alert" hidden></p>
       </section>
 
       <section class="panel panel--preview" aria-label="Resume preview">
-        <div class="placeholder" data-region="preview">The rendered resume appears here.</div>
+        <div class="previewbar">
+          <span class="previewbar__run" data-role="run-label"></span>
+          <a class="button" data-role="download" download hidden>Download PDF</a>
+        </div>
+        <div class="placeholder" data-role="preview-placeholder">
+          The rendered resume appears here.
+        </div>
+        <iframe class="preview" data-role="preview" title="Rendered resume" hidden></iframe>
       </section>
     </main>
 
