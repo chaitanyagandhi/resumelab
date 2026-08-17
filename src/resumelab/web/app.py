@@ -33,7 +33,9 @@ from resumelab.llm.factory import create_llm_client
 from resumelab.loaders import load_job_description
 from resumelab.models.resume import GeneratedResume
 from resumelab.pipeline import GenerationResult, StageReporter, generate_resume
+from resumelab.rendering import RenderOptions
 from resumelab.utils.paths import ensure_within
+from resumelab.web.edits import EDITED_PDF_FILE, EDITED_RESUME_FILE, EditOutcome, save_edit
 from resumelab.web.jobs import GenerationJob, JobRegistry
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,15 @@ class GenerateRequest(BaseModel):
         if (self.url is None) == (self.text is None):
             raise ValueError("supply exactly one of url and text")
         return self
+
+
+class EditRequest(BaseModel):
+    """An edited resume, and how it should be laid out."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    resume: GeneratedResume
+    options: RenderOptions | None = None
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
@@ -131,25 +142,35 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/api/runs/{run_id}/resume")
     def run_resume(run_id: str) -> GeneratedResume:
         """The generated content, as the editor will load and send it back."""
-        path = _artifact(config, run_id, RESUME_FILE)
-        try:
-            return GeneratedResume.model_validate_json(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError) as exc:
-            logger.warning("unreadable resume run=%s: %s", run_id, exc)
-            raise HTTPException(
-                status_code=500, detail=f"The resume for run {run_id} could not be read."
-            ) from exc
+        return _read_resume(_artifact(config, run_id, RESUME_FILE), run_id)
 
     @app.get("/api/runs/{run_id}/resume.pdf")
     def run_pdf(run_id: str) -> FileResponse:
-        return FileResponse(
-            _artifact(config, run_id, PDF_FILE),
-            media_type="application/pdf",
-            # Shown in the page rather than downloaded; the browser's own viewer is
-            # a better preview than anything worth building here.
-            content_disposition_type="inline",
-            filename=f"{run_id}.pdf",
-        )
+        return _inline_pdf(_artifact(config, run_id, PDF_FILE), run_id)
+
+    @app.put("/api/runs/{run_id}/edit")
+    def save_run_edit(run_id: str, request: EditRequest) -> EditOutcome:
+        """Re-render hand-edited content, leaving what the model wrote untouched.
+
+        The edit is not held to the length budget the generation stages were. Those
+        limits exist to keep a model inside a format; someone editing their own
+        resume is told the page count and left to decide.
+        """
+        directory = _run_directory(config, run_id)
+        try:
+            return save_edit(directory, request.resume, options=request.options)
+        except ResumeLabError as exc:
+            logger.warning("edit could not be saved run=%s: %s", run_id, exc)
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+    @app.get("/api/runs/{run_id}/edit")
+    def run_edit(run_id: str) -> GeneratedResume:
+        """The edited content, so reopening a run does not lose what was typed."""
+        return _read_resume(_artifact(config, run_id, EDITED_RESUME_FILE), run_id)
+
+    @app.get("/api/runs/{run_id}/edit.pdf")
+    def run_edit_pdf(run_id: str) -> FileResponse:
+        return _inline_pdf(_artifact(config, run_id, EDITED_PDF_FILE), f"{run_id}-edited")
 
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
@@ -162,11 +183,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     return app
 
 
-def _artifact(settings: Settings, run_id: str, name: str) -> Path:
-    """Resolve one file inside a run directory, or refuse to say it exists.
+def _run_directory(settings: Settings, run_id: str) -> Path:
+    """Resolve a run directory, or refuse to say whether it exists.
 
-    ``run_id`` comes from the browser. A traversal attempt and a genuine typo get the
-    same answer, so the endpoint cannot be used to probe the filesystem.
+    ``run_id`` comes from the browser and becomes a filesystem path. A traversal
+    attempt and a genuine typo get the same answer, so this cannot be used to probe
+    the filesystem.
     """
     try:
         directory = ensure_within(
@@ -176,7 +198,38 @@ def _artifact(settings: Settings, run_id: str, name: str) -> Path:
         logger.warning("rejected run id=%r: %s", run_id, exc)
         raise HTTPException(status_code=404, detail=f"No such run: {run_id}") from exc
 
-    path = directory / name
-    if not path.is_file():
+    if not directory.is_dir():
         raise HTTPException(status_code=404, detail=f"No such run: {run_id}")
+    return directory
+
+
+def _artifact(settings: Settings, run_id: str, name: str) -> Path:
+    """Resolve one file inside a run directory, insisting it is there."""
+    path = _run_directory(settings, run_id) / name
+    if not path.is_file():
+        raise HTTPException(status_code=404, detail=f"Run {run_id} has no {name}")
     return path
+
+
+def _read_resume(path: Path, run_id: str) -> GeneratedResume:
+    """Load a recorded resume, treating an unreadable one as a server-side fault."""
+    try:
+        return GeneratedResume.model_validate_json(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError) as exc:
+        logger.warning("unreadable resume run=%s path=%s: %s", run_id, path.name, exc)
+        raise HTTPException(
+            status_code=500, detail=f"The resume for run {run_id} could not be read."
+        ) from exc
+
+
+def _inline_pdf(path: Path, filename: str) -> FileResponse:
+    """Serve a PDF for the browser to show rather than download.
+
+    The browser's own viewer is a better preview than anything worth building here.
+    """
+    return FileResponse(
+        path,
+        media_type="application/pdf",
+        content_disposition_type="inline",
+        filename=f"{filename}.pdf",
+    )

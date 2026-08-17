@@ -12,7 +12,7 @@ from fastapi.testclient import TestClient
 
 from resumelab import __version__
 from resumelab.config import LLMProvider, Settings
-from resumelab.exceptions import ConfigurationError, JDAnalysisError
+from resumelab.exceptions import ConfigurationError, JDAnalysisError, PDFRenderingError
 from resumelab.experiment.recorder import PDF_FILE, RESUME_FILE
 from resumelab.web import create_app
 from resumelab.web.app import INDEX_FILE, STATIC_DIRECTORY, _artifact
@@ -232,6 +232,106 @@ def test_a_run_whose_resume_is_unreadable_is_reported(client, settings):
     (directory / RESUME_FILE).write_text("{ not json", encoding="utf-8")
 
     assert client.get(f"/api/runs/{RUN_ID}/resume").status_code == 500
+
+
+# --- editing what a run produced ------------------------------------------
+
+
+def test_an_edit_is_saved_and_rendered(client, run_directory, generated_resume):
+    edited = generated_resume.model_copy(update={"summary": "A hand-written summary."})
+
+    response = client.put(
+        f"/api/runs/{RUN_ID}/edit", json={"resume": edited.model_dump(mode="json")}
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {"page_count": 1, "scale": 1.0, "fits_on_one_page": True}
+
+
+def test_an_edit_leaves_what_the_model_wrote_untouched(client, run_directory, generated_resume):
+    """The run is a research record; the edit is a separate document beside it."""
+    original = (run_directory / RESUME_FILE).read_text(encoding="utf-8")
+    edited = generated_resume.model_copy(update={"summary": "A hand-written summary."})
+
+    client.put(f"/api/runs/{RUN_ID}/edit", json={"resume": edited.model_dump(mode="json")})
+
+    assert (run_directory / RESUME_FILE).read_text(encoding="utf-8") == original
+    assert client.get(f"/api/runs/{RUN_ID}/resume").json()["summary"] == generated_resume.summary
+
+
+def test_an_edit_can_be_read_back(client, run_directory, generated_resume):
+    edited = generated_resume.model_copy(update={"summary": "A hand-written summary."})
+
+    client.put(f"/api/runs/{RUN_ID}/edit", json={"resume": edited.model_dump(mode="json")})
+
+    assert client.get(f"/api/runs/{RUN_ID}/edit").json()["summary"] == "A hand-written summary."
+
+
+def test_the_edited_pdf_is_served(client, run_directory, generated_resume):
+    client.put(
+        f"/api/runs/{RUN_ID}/edit", json={"resume": generated_resume.model_dump(mode="json")}
+    )
+
+    response = client.get(f"/api/runs/{RUN_ID}/edit.pdf")
+
+    assert response.status_code == 200
+    assert response.content.startswith(b"%PDF-")
+
+
+def test_render_options_travel_with_the_edit(client, run_directory, generated_resume):
+    response = client.put(
+        f"/api/runs/{RUN_ID}/edit",
+        json={
+            "resume": generated_resume.model_dump(mode="json"),
+            "options": {"include_summary": False, "include_gpa": False},
+        },
+    )
+
+    assert response.status_code == 200
+
+
+def test_an_invalid_section_order_is_rejected(client, run_directory, generated_resume):
+    response = client.put(
+        f"/api/runs/{RUN_ID}/edit",
+        json={
+            "resume": generated_resume.model_dump(mode="json"),
+            "options": {"section_order": ["skills", "skills", "projects", "education"]},
+        },
+    )
+
+    assert response.status_code == 422
+
+
+def test_an_unrenderable_edit_is_reported(client, run_directory, generated_resume, monkeypatch):
+    def refuse(*_args, **_kwargs):
+        raise PDFRenderingError("the page could not be laid out")
+
+    monkeypatch.setattr("resumelab.web.edits.render_resume", refuse)
+
+    response = client.put(
+        f"/api/runs/{RUN_ID}/edit", json={"resume": generated_resume.model_dump(mode="json")}
+    )
+
+    assert response.status_code == 400
+    assert "could not be laid out" in response.json()["detail"]
+
+
+def test_an_edit_to_an_unknown_run_is_not_found(client, generated_resume):
+    response = client.put(
+        "/api/runs/2026-01-01T000000_nope/edit",
+        json={"resume": generated_resume.model_dump(mode="json")},
+    )
+
+    assert response.status_code == 404
+
+
+def test_a_run_that_was_never_edited_has_no_edit(client, run_directory):
+    assert client.get(f"/api/runs/{RUN_ID}/edit").status_code == 404
+    assert client.get(f"/api/runs/{RUN_ID}/edit.pdf").status_code == 404
+
+
+def test_an_edit_without_a_resume_is_rejected(client, run_directory):
+    assert client.put(f"/api/runs/{RUN_ID}/edit", json={}).status_code == 422
 
 
 # --- run identifiers come from the browser --------------------------------
