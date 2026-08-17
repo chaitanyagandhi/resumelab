@@ -26,6 +26,7 @@ from resumelab.llm.client import LLMCallStats, TokenUsage
 from resumelab.models.analysis import JobAnalysis
 from resumelab.models.resume import (
     MAX_SKILL_COUNT,
+    MAX_SUBTITLE_CHARACTERS,
     CondensedContent,
     ExperienceBullets,
     GeneratedSkills,
@@ -208,8 +209,8 @@ class DeterministicLLM:
         source = _json_section(prompt, "SOURCE PROJECT")
         terms = list(direction["concepts_to_incorporate"]) or ["systems"]
         return ProjectContent(
-            subtitle=f"{direction['possible_title_direction']} for {source['name']}"[:90],
-            technologies=tuple(dict.fromkeys([*terms, "Linux", "Go"]))[:6],
+            subtitle=f"{direction['possible_title_direction']}"[:MAX_SUBTITLE_CHARACTERS],
+            technologies=tuple(dict.fromkeys([*terms, "Linux", "Go"]))[:3],
             bullets=_bullets(direction, seed=source["name"]),
         )
 

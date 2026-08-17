@@ -186,6 +186,14 @@ middle dot is square.
 DATE_RANGE_SEPARATOR = " \u2013 "
 """En dash, the typographic convention for a span of dates."""
 
+PROJECT_TITLE_SEPARATOR = " - "
+"""Divides a project's name from its subtitle.
+
+A hyphen, not an em dash. Nothing on this page uses an em dash: it is the most
+recognizable signature of machine-written text, and a document whose whole purpose is
+to read as though a person wrote it cannot afford one.
+"""
+
 PROJECT_STACK_SEPARATOR = " / "
 """Divides a project's subtitle from the stack sharing its line.
 

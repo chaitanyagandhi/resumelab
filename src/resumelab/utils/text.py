@@ -62,6 +62,25 @@ def _trim_to_word(slug: str, max_length: int) -> str:
     return clipped
 
 
+_NUMERIC_RANGE_DASH = re.compile(r"(?<=\d)\s*[\u2014\u2013]\s*(?=\d)")
+_CLAUSE_DASH = re.compile(r"\s*[\u2014\u2013]\s*")
+
+
+def soften_dashes(value: str) -> str:
+    """Replace em and en dashes in generated prose with ordinary punctuation.
+
+    Between digits the dash is bounding a range, so it becomes a hyphen; anywhere
+    else it is joining clauses, so it becomes a comma.
+
+    These read as a machine wrote them. That matters here in a way it would not in
+    most software: the output's whole purpose is to pass as something a person
+    wrote, and the em dash is the single most recognizable tell. Sanitized rather
+    than rejected, because it is punctuation and not content, and a formatting slip
+    is never worth an API call.
+    """
+    return _CLAUSE_DASH.sub(", ", _NUMERIC_RANGE_DASH.sub("-", value))
+
+
 def control_characters(value: str) -> list[str]:
     """Return the control characters in ``value``, as escaped literals.
 

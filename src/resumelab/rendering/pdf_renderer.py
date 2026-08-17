@@ -125,7 +125,8 @@ def _build_document(resume: GeneratedResume, scale: float) -> tuple[bytes, int]:
         rightMargin=styles.MARGIN_HORIZONTAL,
         topMargin=styles.MARGIN_TOP,
         bottomMargin=styles.MARGIN_BOTTOM,
-        title=f"{resume.personal.name} — Resume",
+        # No em dash: this is document metadata a reader can surface in a PDF viewer.
+        title=f"{resume.personal.name} Resume",
         author=resume.personal.name,
     )
     try:
@@ -220,22 +221,17 @@ def _experiences(
     stylesheet: dict[str, ParagraphStyle],
 ) -> Iterable[Flowable]:
     for entry in entries:
-        # Laid out as education is: the anchor and its dates, then the qualifying
-        # detail and its own right-hand field. The title moves down with the location
-        # rather than leaving that line half empty.
+        # One line per role: the title carries the weight, the employer qualifies it.
+        # Location is deliberately absent — on a one-page resume it is the field a
+        # reader is least likely to need and the first worth spending on something else.
+        heading = _bold(entry.title)
+        if entry.company:
+            heading = f"{heading}, <i>{_text(entry.company)}</i>"
         yield _flush_right_row(
-            _bold(entry.company),
+            heading,
             _date_text(entry.start_date, entry.end_date),
             stylesheet,
         )
-        if entry.title or entry.location:
-            yield _flush_right_row(
-                _text(entry.title),
-                entry.location or "",
-                stylesheet,
-                leading_style="detail",
-                trailing_style="detail_right",
-            )
         for bullet in entry.bullets:
             yield _bullet(bullet, stylesheet)
 
@@ -245,7 +241,7 @@ def _projects(
     stylesheet: dict[str, ParagraphStyle],
 ) -> Iterable[Flowable]:
     for entry in entries:
-        heading = f"{_bold(entry.name)} — {_text(entry.subtitle)}"
+        heading = f"{_bold(entry.name)}{styles.PROJECT_TITLE_SEPARATOR}{_text(entry.subtitle)}"
         if entry.technologies:
             # On the title line rather than beneath it: the stack qualifies the
             # subtitle, and a line of its own spends a line saying so.

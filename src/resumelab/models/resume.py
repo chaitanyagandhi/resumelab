@@ -19,6 +19,7 @@ from resumelab.models.candidate import (
     PersonalDetails,
 )
 from resumelab.models.common import GENERATED_MODEL_CONFIG, clean_items
+from resumelab.utils.text import soften_dashes
 
 REQUIRED_EXPERIENCE_BULLET_COUNT = 3
 """Bullets emitted per role. A fixed count keeps runs comparable."""
@@ -26,8 +27,16 @@ REQUIRED_EXPERIENCE_BULLET_COUNT = 3
 MIN_SUBTITLE_CHARACTERS = 10
 """Below this a subtitle says nothing about what the project is."""
 
-MAX_SUBTITLE_CHARACTERS = 90
-"""Long enough to reposition a project, short enough to stay on one line."""
+MAX_SUBTITLE_CHARACTERS = 45
+"""Long enough to reposition a project, short enough to stay on the title line."""
+
+MAX_PROJECT_HEADING_CHARACTERS = 60
+"""Budget for the subtitle and the stack together, which share the title line.
+
+Bounding them separately is not enough: either can be within its own limit while the
+pair still wraps. Measured against the rendered width at the widest project name in a
+typical profile, so a long name degrades to two lines rather than colliding with the
+date."""
 
 MIN_PROJECT_TECHNOLOGIES = 2
 """A project presented as using one technology reads as unfinished."""
@@ -95,7 +104,7 @@ def _normalize_summary(value: str) -> str:
     Length is enforced by rejection, so the model rewrites to fit instead of having
     a sentence cut off mid-clause.
     """
-    collapsed = " ".join(value.split())
+    collapsed = soften_dashes(" ".join(value.split()))
     if not collapsed:
         raise ValueError("must not be empty")
     if len(collapsed) < MIN_SUMMARY_CHARACTERS:
@@ -127,7 +136,7 @@ def _normalize_bullet(value: str) -> str:
     A leading glyph is stripped rather than rejected: the renderer draws its own, and
     a model that adds one has made a formatting slip, not a content error.
     """
-    collapsed = " ".join(_LIST_MARKER.sub("", value).split())
+    collapsed = soften_dashes(" ".join(_LIST_MARKER.sub("", value).split()))
     if not collapsed:
         raise ValueError("must not be empty")
     if len(collapsed) < MIN_BULLET_CHARACTERS:
@@ -176,7 +185,7 @@ class ExperienceBullets(BaseModel):
 
 def _normalize_subtitle(value: str) -> str:
     """Hold the subtitle to something that fits on the title line."""
-    collapsed = " ".join(value.split())
+    collapsed = soften_dashes(" ".join(value.split()))
     if len(collapsed) < MIN_SUBTITLE_CHARACTERS:
         raise ValueError(
             f"must be at least {MIN_SUBTITLE_CHARACTERS} characters, got {len(collapsed)}"
@@ -223,6 +232,17 @@ class ProjectContent(BaseModel):
     subtitle: SubtitleText
     technologies: ProjectTechnologies
     bullets: Annotated[tuple[BulletText, ...], AfterValidator(_reject_repeated_bullets)]
+
+    @model_validator(mode="after")
+    def _check_heading_fits_one_line(self) -> ProjectContent:
+        """The subtitle and the stack share the title line with the project name."""
+        heading = len(self.subtitle) + len(", ".join(self.technologies))
+        if heading > MAX_PROJECT_HEADING_CHARACTERS:
+            raise ValueError(
+                f"subtitle and technologies must be at most "
+                f"{MAX_PROJECT_HEADING_CHARACTERS} characters together, got {heading}"
+            )
+        return self
 
     @model_validator(mode="after")
     def _check_bullet_count(self) -> ProjectContent:

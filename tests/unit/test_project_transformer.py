@@ -22,8 +22,8 @@ from resumelab.models.resume import (
 )
 from resumelab.pipeline import transform_projects
 
-SUBTITLE = "NVMe-oF Backed Event Processing Engine"
-TECHNOLOGIES = ("Go", "Linux", "NVMe-oF", "PostgreSQL")
+SUBTITLE = "NVMe-oF Event Processing Engine"
+TECHNOLOGIES = ("Go", "Linux", "NVMe-oF")
 BULLETS = (
     "Designed a shared-nothing ingestion architecture that fans writes across NVMe-oF "
     "targets, sustaining 40k events per second per node.",
@@ -75,7 +75,7 @@ def test_three_bullets_are_accepted():
 
 
 def test_an_over_long_subtitle_is_rejected():
-    with pytest.raises(ValidationError, match="at most 90 characters"):
+    with pytest.raises(ValidationError, match="at most 45 characters"):
         content(subtitle="x" * (MAX_SUBTITLE_CHARACTERS + 1))
 
 
@@ -302,3 +302,12 @@ def test_generated_project_accepts_a_missing_date():
     )
 
     assert project.date is None
+
+
+def test_a_subtitle_and_stack_that_will_not_share_a_line_are_rejected():
+    """Each can be within its own limit while the pair still wraps."""
+    with pytest.raises(ValidationError, match="at most 60 characters together"):
+        content(
+            subtitle="Distributed Storage Control Plane",
+            technologies=("PostgreSQL", "Kubernetes", "OpenTelemetry"),
+        )

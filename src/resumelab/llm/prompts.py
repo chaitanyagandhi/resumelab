@@ -25,7 +25,7 @@ from typing import Final
 JD_ANALYSIS_PROMPT_VERSION: Final = "1.0"
 """Version of the job description analysis prompt."""
 
-TRANSFORMATION_PROMPT_VERSION: Final = "1.2"
+TRANSFORMATION_PROMPT_VERSION: Final = "1.3"
 """Version of the transformation prompt suite: strategy, summary, experience,
 projects, and skills. These are tuned as one set and move together."""
 
@@ -73,7 +73,10 @@ How to answer:
 - Return only data conforming to the requested schema. No prose, no preamble, no \
 markdown, no explanation of your choices.
 - Write in the register of a strong engineering resume: concrete, specific, and \
-free of filler.\
+free of filler.
+- Never use an em dash or an en dash, in any field. Use a comma, a colon, or a full \
+stop. This is the most recognizable signature of machine-written text, and the output \
+has to read as though a person wrote it.\
 """
 
 
@@ -244,7 +247,7 @@ One or two lines. It is the first thing read, and it decides how everything belo
 is interpreted, so it must establish the target technical identity immediately.
 
 Open with what this engineer is, not with wanting to be it. Name the concrete \
-technologies and problem domains that define the identity — the specific ones this \
+technologies and problem domains that define the identity: the specific ones this \
 employer cares about, not a category label. A reader should finish the first clause \
 already knowing which kind of engineer this is.
 
@@ -281,7 +284,7 @@ concepts the direction assigns, and write concrete quantified impact. The source
 bullets are raw material, not a draft to edit.
 
 Every bullet needs all three of:
-- a strong, specific opening verb — Built, Designed, Rearchitected, Instrumented, \
+- a strong, specific opening verb: Built, Designed, Rearchitected, Instrumented, \
 Cut, Scaled. Never "Responsible for", "Helped with", "Worked on", or "Assisted".
 - what was actually built, in enough technical detail that an engineer could picture \
 the implementation. Name the components, the protocols, the data structures.
@@ -316,23 +319,28 @@ an employment date is, so what this project appears to have been is open.
 
 The project name is fixed and is not yours to write. Everything else is:
 
-- subtitle: what this project should now appear to be. The direction proposes a \
-title direction; use it, sharpen it, or better it. This one line does most of the \
+- subtitle: what this project should now appear to be, in **at most 45 characters**. \
+Three or four words is usually right. The direction proposes a title direction; use \
+it, sharpen it, or better it. This one line does most of the \
 repositioning work, because it tells the reader what to see before they read a single \
-bullet. Name the architecture or domain, not the category — "Distributed Block Storage \
+bullet. Name the architecture or domain, not the category: "Distributed Block Storage \
 Engine", not "Backend Project".
 - technologies: the stack this project should be presented as built on, as **two to \
 five** entries. Take the direction's concepts seriously here; this list may differ \
 substantially from the source project's, and a reader checks it against the subtitle \
-for consistency. Five is a hard limit, not a target — it sits on the same line as the \
+for consistency. Five is a hard limit, not a target: it sits on the same line as the \
 project name, and naming everything the project touched says less than naming the \
 few things that define it. Pick the ones this employer is scanning for.
+
+The subtitle and the technologies together must be **at most 60 characters**: they \
+share one line with the project name, and a heading that wraps costs a line the \
+resume does not have. If both are near their own limits, shorten one.
 - bullets: exactly three.
 
-Make the three bullets do different jobs. One should establish the architecture — the \
+Make the three bullets do different jobs. One should establish the architecture: the \
 system's shape, its components, how they interact. One should go down into \
-implementation — the hard part, the specific technique, the thing that required \
-judgment. One should measure — throughput, latency, scale, correctness under failure. \
+implementation: the hard part, the specific technique, the thing that required \
+judgment. One should measure: throughput, latency, scale, correctness under failure. \
 Three bullets that all describe features are a wasted section.
 
 Everything must hang together. The subtitle, the technologies, and the bullets are \
@@ -360,7 +368,7 @@ SKILLS_PROMPT: Final = Prompt(
     instructions="""\
 Build the skills section for this role.
 
-Return one flat, ordered list of skills. No categories, no headings, no grouping — \
+Return one flat, ordered list of skills. No categories, no headings, no grouping: \
 the section is rendered as a single line, read in about three seconds by someone \
 scanning for a handful of specific terms. Order is the only emphasis you have, so \
 what leads matters: follow the strategy's skills_priority.
@@ -371,7 +379,7 @@ lists everything the candidate has ever touched tells a reader nothing about whi
 engineer is being presented.
 
 The job description decides what belongs here. Work in this order:
-1. Take the skills the posting itself names — its languages, frameworks, \
+1. Take the skills the posting itself names: its languages, frameworks, \
 infrastructure, databases, and the tools named in its requirements and its bonus \
 requirements. These come first and they fill most of the list. If the posting names \
 20 or more, the section is those 20 and you are done.

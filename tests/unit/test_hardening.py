@@ -21,7 +21,7 @@ from resumelab.models.job import MAX_JOB_DESCRIPTION_CHARACTERS, MIN_JOB_DESCRIP
 from resumelab.models.resume import GeneratedSummary
 from resumelab.utils.errors import describe_validation_error
 from resumelab.utils.paths import ensure_within, prepare_output_file
-from resumelab.utils.text import control_characters, normalize_text, slugify
+from resumelab.utils.text import control_characters, normalize_text, slugify, soften_dashes
 
 JD = (
     "Storage Infrastructure Engineer. Build distributed storage services in Go "
@@ -296,3 +296,52 @@ def test_an_error_with_no_value_to_quote_still_reports_the_rule():
 
     assert "summary" in prompt
     assert "you returned:" not in prompt
+
+
+# --- em dashes never reach the page ---------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("written", "expected"),
+    [
+        ("Storage engineer \u2014 builds Go services.", "Storage engineer, builds Go services."),
+        ("Engineer\u2014Go and Java.", "Engineer, Go and Java."),
+        (
+            "Cut latency 40% \u2013 improving reliability.",
+            "Cut latency 40%, improving reliability.",
+        ),
+        ("Handled 5\u201310 requests per second.", "Handled 5-10 requests per second."),
+        ("State-of-the-art, already clean.", "State-of-the-art, already clean."),
+    ],
+)
+def test_dashes_are_softened_into_ordinary_punctuation(written, expected):
+    """The em dash is the most recognizable tell that a machine wrote the text."""
+    assert soften_dashes(written) == expected
+
+
+def test_a_generated_summary_never_keeps_an_em_dash():
+    """Sanitized at the model boundary, so no stage downstream has to care."""
+    summary = GeneratedSummary(
+        summary=(
+            "Distributed storage engineer \u2014 builds Go and Java services across "
+            "Linux control planes, with depth in replication and failure recovery."
+        )
+    )
+
+    assert "\u2014" not in summary.summary
+    assert "\u2013" not in summary.summary
+    assert "engineer, builds" in summary.summary
+
+
+def test_no_prompt_sent_to_the_model_contains_an_em_dash():
+    """The model mirrors the register it is given, so the prompts have to be clean."""
+    from resumelab.llm import prompts
+
+    offenders = [
+        name
+        for name, value in vars(prompts).items()
+        if isinstance(value, prompts.Prompt)
+        and ("\u2014" in value.system or "\u2013" in value.system)
+    ]
+
+    assert offenders == []
