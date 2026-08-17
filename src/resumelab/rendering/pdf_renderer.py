@@ -250,9 +250,9 @@ def _projects(
             # On the title line rather than beneath it: the stack qualifies the
             # subtitle, and a line of its own spends a line saying so.
             stack = _text(", ".join(entry.technologies))
-            # The separator sits inside the italic run, so it leans with the stack it
-            # introduces instead of standing upright against it.
-            heading += f"<i>{styles.PROJECT_STACK_SEPARATOR}{stack}</i>"
+            # The separator stays outside the italic run. A slash already leans; put it
+            # inside and the oblique font leans it a second time, which overshoots.
+            heading += f"{styles.PROJECT_STACK_SEPARATOR}<i>{stack}</i>"
         yield _flush_right_row(heading, entry.date or "", stylesheet)
         for bullet in entry.bullets:
             yield _bullet(bullet, stylesheet)

@@ -194,8 +194,10 @@ name and the subtitle, and a third dot after it would read as one more field in 
 same run rather than a shift to the technologies.
 
 A slash rather than a pipe: it leans the way the italic stack beside it does, where a
-pipe stands upright against it even when italicised. Plain ASCII, so it extracts as
-``/`` everywhere and the shape costs a parser nothing.
+pipe stands upright against it even when italicised. Drawn upright rather than inside
+the italic run, because a slash already carries its own angle and the oblique font
+would add a second one. Plain ASCII, so it extracts as ``/`` everywhere and the shape
+costs a parser nothing.
 """
 
 
