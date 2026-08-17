@@ -332,9 +332,9 @@ for consistency. Five is a hard limit, not a target: it sits on the same line as
 project name, and naming everything the project touched says less than naming the \
 few things that define it. Pick the ones this employer is scanning for.
 
-The subtitle and the technologies together must be **at most 60 characters**: they \
-share one line with the project name, and a heading that wraps costs a line the \
-resume does not have. If both are near their own limits, shorten one.
+Keep the subtitle and the technologies together under **70 characters**: they share \
+one line with the project name, and a heading that wraps costs a line the resume does \
+not have. Prefer three sharp technologies over five padded ones.
 - bullets: exactly three.
 
 Make the three bullets do different jobs. One should establish the architecture: the \

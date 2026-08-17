@@ -11,7 +11,14 @@ from __future__ import annotations
 import re
 from typing import Annotated
 
-from pydantic import AfterValidator, BaseModel, ConfigDict, model_validator
+from pydantic import (
+    AfterValidator,
+    BaseModel,
+    ConfigDict,
+    ValidationInfo,
+    field_validator,
+    model_validator,
+)
 
 from resumelab.models.candidate import (
     REQUIRED_PROJECT_BULLET_COUNT,
@@ -30,13 +37,15 @@ MIN_SUBTITLE_CHARACTERS = 10
 MAX_SUBTITLE_CHARACTERS = 45
 """Long enough to reposition a project, short enough to stay on the title line."""
 
-MAX_PROJECT_HEADING_CHARACTERS = 60
+MAX_PROJECT_HEADING_CHARACTERS = 78
 """Budget for the subtitle and the stack together, which share the title line.
 
 Bounding them separately is not enough: either can be within its own limit while the
-pair still wraps. Measured against the rendered width at the widest project name in a
-typical profile, so a long name degrades to two lines rather than colliding with the
-date."""
+pair still wraps. Measured with :func:`pdfmetrics.stringWidth` against the date column
+at the longest project name in a full profile, not estimated from character counts.
+
+Enforced by trimming, never by rejection — see :meth:`ProjectContent._fit_heading`.
+"""
 
 MIN_PROJECT_TECHNOLOGIES = 2
 """A project presented as using one technology reads as unfinished."""
@@ -233,16 +242,40 @@ class ProjectContent(BaseModel):
     technologies: ProjectTechnologies
     bullets: Annotated[tuple[BulletText, ...], AfterValidator(_reject_repeated_bullets)]
 
-    @model_validator(mode="after")
-    def _check_heading_fits_one_line(self) -> ProjectContent:
-        """The subtitle and the stack share the title line with the project name."""
-        heading = len(self.subtitle) + len(", ".join(self.technologies))
-        if heading > MAX_PROJECT_HEADING_CHARACTERS:
-            raise ValueError(
-                f"subtitle and technologies must be at most "
-                f"{MAX_PROJECT_HEADING_CHARACTERS} characters together, got {heading}"
-            )
-        return self
+    @field_validator("technologies")
+    @classmethod
+    def _fit_heading(cls, technologies: tuple[str, ...], info: ValidationInfo) -> tuple[str, ...]:
+        """Drop trailing technologies until the title line fits.
+
+        Sanitized, never rejected. Whether a heading wraps is a layout question with a
+        deterministic answer — the technologies are in priority order, so the last one
+        is the cheapest thing on the line — and the house rule is that an API call is
+        spent on content errors only. Rejecting it instead cost a user a whole run:
+        the model cannot tell which of two fields to shorten, so it rewrites both,
+        breaks something else, and the retry budget goes on a heading that would have
+        rendered fine.
+
+        A heading still over budget at :data:`MIN_PROJECT_TECHNOLOGIES` is left alone
+        and wraps to a second line. That costs one line; failing the run costs every
+        token spent on it.
+
+        A field validator rather than a model validator because this has to *change* a
+        value: pydantic ignores a model validator that returns anything but ``self``
+        when the model is built through ``__init__``, so trimming there silently did
+        nothing. ``subtitle`` is declared first, so it is already validated and
+        available on ``info.data``.
+        """
+        subtitle = info.data.get("subtitle")
+        if not isinstance(subtitle, str):
+            return technologies  # subtitle failed its own validation; report that
+
+        trimmed = list(technologies)
+        while (
+            len(trimmed) > MIN_PROJECT_TECHNOLOGIES
+            and len(subtitle) + len(", ".join(trimmed)) > MAX_PROJECT_HEADING_CHARACTERS
+        ):
+            trimmed.pop()
+        return tuple(trimmed)
 
     @model_validator(mode="after")
     def _check_bullet_count(self) -> ProjectContent:

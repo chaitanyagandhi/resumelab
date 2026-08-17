@@ -13,6 +13,7 @@ from resumelab.exceptions import LLMGenerationError
 from resumelab.llm.prompts import PROJECT_PROMPT
 from resumelab.models.candidate import REQUIRED_PROJECT_BULLET_COUNT
 from resumelab.models.resume import (
+    MAX_PROJECT_HEADING_CHARACTERS,
     MAX_PROJECT_TECHNOLOGIES,
     MAX_SUBTITLE_CHARACTERS,
     MIN_PROJECT_TECHNOLOGIES,
@@ -304,10 +305,53 @@ def test_generated_project_accepts_a_missing_date():
     assert project.date is None
 
 
-def test_a_subtitle_and_stack_that_will_not_share_a_line_are_rejected():
-    """Each can be within its own limit while the pair still wraps."""
-    with pytest.raises(ValidationError, match="at most 60 characters together"):
-        content(
-            subtitle="Distributed Storage Control Plane",
-            technologies=("PostgreSQL", "Kubernetes", "OpenTelemetry"),
-        )
+def test_an_overlong_heading_is_trimmed_rather_than_rejected():
+    """The failure this replaces: a whole run lost to a heading that would have fit.
+
+    The model cannot tell which of two fields to shorten, so it rewrites both, breaks
+    something else, and the retry budget goes. Trimming is deterministic and free.
+    """
+    fitted = content(
+        subtitle="Enterprise Secrets Integration Platform",
+        technologies=("TypeScript", "Node.js", "PostgreSQL", "Redis", "Kubernetes"),
+    )
+
+    assert len(fitted.subtitle) + len(", ".join(fitted.technologies)) <= (
+        MAX_PROJECT_HEADING_CHARACTERS
+    )
+    # Trimmed from the end: the technologies are in priority order.
+    assert fitted.technologies[0] == "TypeScript"
+    assert len(fitted.technologies) < 5
+
+
+def test_a_heading_within_budget_is_left_exactly_as_written():
+    stack = ("Go", "Linux", "NVMe-oF")
+
+    assert content(subtitle="NVMe-oF Event Engine", technologies=stack).technologies == stack
+
+
+def test_trimming_never_goes_below_the_minimum_stack():
+    """A heading that still will not fit wraps. That costs one line, not the run."""
+    fitted = content(
+        subtitle="x" * MAX_SUBTITLE_CHARACTERS,
+        technologies=("PostgreSQL", "Kubernetes", "OpenTelemetry"),
+    )
+
+    assert len(fitted.technologies) == MIN_PROJECT_TECHNOLOGIES
+
+
+def test_trimming_is_not_silently_skipped(recwarn):
+    """The trap this replaces: a model validator returning a new instance.
+
+    Pydantic ignores that when the model is built through ``__init__`` and only warns,
+    so the heading budget looked enforced and did nothing. Building the model the way
+    the SDKs build it must both apply the trim and raise no warning.
+    """
+    fitted = ProjectContent(
+        subtitle="Enterprise Secrets Integration Platform",
+        technologies=("TypeScript", "Node.js", "PostgreSQL", "Kubernetes", "OpenTelemetry"),
+        bullets=BULLETS,
+    )
+
+    assert len(fitted.technologies) < 5
+    assert [str(w.message) for w in recwarn.list] == []
