@@ -191,8 +191,11 @@ PROJECT_STACK_SEPARATOR = " | "
 
 Deliberately not :data:`SEPARATOR`. That line already carries an em dash between the
 name and the subtitle, and a third dot after it would read as one more field in the
-same run rather than a shift to the technologies. Plain ASCII, so it extracts as
-itself everywhere.
+same run rather than a shift to the technologies.
+
+Drawn inside the italic run, so it leans with the stack rather than standing upright
+against it. Plain ASCII either way, so it extracts as ``|`` everywhere and the slant
+costs nothing to a parser.
 """
 
 
