@@ -682,7 +682,14 @@ def test_project_technologies_sit_on_the_title_line(extracted, generated_resume)
     """The stack qualifies the subtitle; a line of its own spends a line saying so."""
     project = generated_resume.projects[0]
 
-    assert f"{project.subtitle} • {', '.join(project.technologies)}" in extracted
+    separator = styles.PROJECT_STACK_SEPARATOR
+    assert f"{project.subtitle}{separator}{', '.join(project.technologies)}" in extracted
+
+
+def test_the_project_stack_uses_its_own_separator(extracted, generated_resume):
+    """A third dot on that line would read as one more field, not a shift to the stack."""
+    assert styles.PROJECT_STACK_SEPARATOR != styles.SEPARATOR
+    assert styles.PROJECT_STACK_SEPARATOR.strip() in extracted
 
 
 def test_a_project_without_technologies_still_renders_its_heading(tmp_path, generated_resume):

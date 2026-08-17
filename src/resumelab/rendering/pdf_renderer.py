@@ -249,7 +249,8 @@ def _projects(
         if entry.technologies:
             # On the title line rather than beneath it: the stack qualifies the
             # subtitle, and a line of its own spends a line saying so.
-            heading = _joined(heading, f"<i>{_text(', '.join(entry.technologies))}</i>")
+            stack = _text(", ".join(entry.technologies))
+            heading += f"{styles.PROJECT_STACK_SEPARATOR}<i>{stack}</i>"
         yield _flush_right_row(heading, entry.date or "", stylesheet)
         for bullet in entry.bullets:
             yield _bullet(bullet, stylesheet)

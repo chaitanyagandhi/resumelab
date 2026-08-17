@@ -186,6 +186,15 @@ middle dot is square.
 DATE_RANGE_SEPARATOR = " \u2013 "
 """En dash, the typographic convention for a span of dates."""
 
+PROJECT_STACK_SEPARATOR = " | "
+"""Divides a project's subtitle from the stack sharing its line.
+
+Deliberately not :data:`SEPARATOR`. That line already carries an em dash between the
+name and the subtitle, and a third dot after it would read as one more field in the
+same run rather than a shift to the technologies. Plain ASCII, so it extracts as
+itself everywhere.
+"""
+
 
 def heading_row_style() -> TableStyle:
     """Styling for the two-cell row that sets a heading against its date.
