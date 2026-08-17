@@ -186,16 +186,16 @@ middle dot is square.
 DATE_RANGE_SEPARATOR = " \u2013 "
 """En dash, the typographic convention for a span of dates."""
 
-PROJECT_STACK_SEPARATOR = " | "
+PROJECT_STACK_SEPARATOR = " / "
 """Divides a project's subtitle from the stack sharing its line.
 
 Deliberately not :data:`SEPARATOR`. That line already carries an em dash between the
 name and the subtitle, and a third dot after it would read as one more field in the
 same run rather than a shift to the technologies.
 
-Drawn inside the italic run, so it leans with the stack rather than standing upright
-against it. Plain ASCII either way, so it extracts as ``|`` everywhere and the slant
-costs nothing to a parser.
+A slash rather than a pipe: it leans the way the italic stack beside it does, where a
+pipe stands upright against it even when italicised. Plain ASCII, so it extracts as
+``/`` everywhere and the shape costs a parser nothing.
 """
 
 
