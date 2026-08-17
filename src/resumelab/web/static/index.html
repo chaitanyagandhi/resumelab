@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>ResumeLab</title>
+    <link rel="stylesheet" href="/static/app.css" />
+  </head>
+  <body>
+    <header class="masthead">
+      <h1>Resume Generator</h1>
+      <p class="masthead__subtitle">
+        Generate a resume tailored to a job posting, then edit it in place.
+      </p>
+    </header>
+
+    <p class="disclaimer" role="note">
+      A research prototype. Generated resumes may present technologies, metrics, and
+      framings that are not in your source profile.
+    </p>
+
+    <main class="workspace">
+      <section class="panel panel--controls" aria-label="Generation settings">
+        <div class="placeholder" data-region="controls">Controls load here.</div>
+      </section>
+
+      <section class="panel panel--preview" aria-label="Resume preview">
+        <div class="placeholder" data-region="preview">The rendered resume appears here.</div>
+      </section>
+    </main>
+
+    <footer class="statusbar">
+      <span class="statusbar__dot" data-role="status-dot" data-state="pending"></span>
+      <span data-role="status-text">Connecting…</span>
+    </footer>
+
+    <script type="module" src="/static/app.js"></script>
+  </body>
+</html>

@@ -3,7 +3,7 @@ PY := $(VENV)/bin/python
 UV := $(shell command -v uv 2>/dev/null)
 
 .DEFAULT_GOAL := help
-.PHONY: help install format lint typecheck test check clean analyze generate
+.PHONY: help install format lint typecheck test check clean analyze generate ui
 
 define require_jd
 	if [ -z "$(JD)" ]; then \
@@ -49,6 +49,9 @@ analyze: ## Analyze a job description (JD=examples/sample_jd.txt)
 generate: ## Generate a resume for a job description (JD=examples/sample_jd.txt)
 	@$(call require_jd)
 	$(VENV)/bin/resumelab generate --jd $(JD)
+
+ui: ## Serve the local review UI (PORT=8000)
+	$(VENV)/bin/resumelab ui --port $(or $(PORT),8000)
 
 clean: ## Remove caches and build artifacts
 	rm -rf .pytest_cache .mypy_cache .ruff_cache .coverage htmlcov dist build

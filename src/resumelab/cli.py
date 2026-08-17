@@ -78,6 +78,11 @@ PdfOutputOption = Annotated[
     Path | None,
     typer.Option("--output", "-o", help="Also write the resume PDF here."),
 ]
+HostOption = Annotated[
+    str,
+    typer.Option("--host", help="Interface to bind. Loopback keeps the UI off the network."),
+]
+PortOption = Annotated[int, typer.Option("--port", help="Port to serve the UI on.")]
 
 
 @app.callback()
@@ -279,6 +284,34 @@ def _choose_provider(settings: Settings, provider: LLMProvider | None) -> LLMPro
 def _is_interactive() -> bool:
     """Whether someone is at the keyboard to answer a question."""
     return sys.stdin.isatty()
+
+
+@app.command()
+def ui(
+    host: HostOption = "127.0.0.1",
+    port: PortOption = 8000,
+    debug: DebugOption = False,
+) -> None:
+    """Serve the local review UI.
+
+    The UI reads the candidate profile and spends the configured API budget, so it
+    binds to the loopback interface: anyone who can reach it can generate resumes at
+    your expense. ``--host 0.0.0.0`` is available for the case where that is wanted
+    deliberately, and there is no authentication to fall back on if it is not.
+    """
+    settings = _load_settings(debug)
+    configure_logging(settings.log_level, debug=debug)
+
+    # Imported here rather than at module scope. FastAPI and uvicorn are a
+    # meaningful share of interpreter start-up, and `resumelab generate` should not
+    # pay for a server it never starts.
+    import uvicorn
+
+    from resumelab.web import create_app
+
+    typer.echo(f"ResumeLab UI on http://{host}:{port} (ctrl-c to stop)")
+    with _reported_failures(debug):
+        uvicorn.run(create_app(), host=host, port=port, log_level=settings.log_level.lower())
 
 
 def _format_result(result: GenerationResult, output: Path | None) -> str:
