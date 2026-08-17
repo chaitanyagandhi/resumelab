@@ -67,12 +67,15 @@
       <section class="panel panel--preview" aria-label="Resume preview">
         <div class="previewbar">
           <span class="previewbar__run" data-role="run-label"></span>
+          <span class="savestate" data-role="save-state" hidden></span>
+          <button class="button" data-role="mode" type="button" hidden>Edit like a doc</button>
           <a class="button" data-role="download" download hidden>Download PDF</a>
         </div>
         <div class="placeholder" data-role="preview-placeholder">
           The rendered resume appears here.
         </div>
         <iframe class="preview" data-role="preview" title="Rendered resume" hidden></iframe>
+        <div class="editor" data-role="editor" hidden></div>
       </section>
     </main>
 
