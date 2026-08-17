@@ -13,7 +13,9 @@ does not fit on a page.
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable
 from dataclasses import dataclass
+from enum import StrEnum
 from pathlib import Path
 from urllib.parse import urlsplit
 
@@ -38,6 +40,28 @@ from resumelab.validation import validate_resume
 logger = logging.getLogger(__name__)
 
 
+class GenerationStage(StrEnum):
+    """The stages a run passes through, in order.
+
+    Named so progress can be reported to something watching a run that has already
+    started. These are the pipeline's own boundaries, not a display vocabulary: a
+    caller that shows them to someone is responsible for labelling them.
+    """
+
+    ANALYSIS = "analysis"
+    STRATEGY = "strategy"
+    SUMMARY = "summary"
+    EXPERIENCE = "experience"
+    PROJECTS = "projects"
+    SKILLS = "skills"
+    ASSEMBLY = "assembly"
+    RENDERING = "rendering"
+
+
+StageReporter = Callable[[GenerationStage], None]
+"""Called as each stage begins. Observation only; it cannot alter the run."""
+
+
 @dataclass(frozen=True, slots=True)
 class GenerationResult:
     """Everything a completed run produced."""
@@ -56,6 +80,7 @@ def generate_resume(
     settings: Settings,
     provider: LLMProvider,
     client: LLMClient,
+    on_stage: StageReporter | None = None,
 ) -> GenerationResult:
     """Run the whole pipeline and record it.
 
@@ -64,6 +89,9 @@ def generate_resume(
         settings: Loaded settings, supplying the profile path and length budget.
         provider: The provider actually in use, for the run's metadata.
         client: The LLM client every stage will use.
+        on_stage: Called as each stage begins, for a caller that has to show
+            progress across a run lasting a minute or more. A run nobody is
+            watching reports to nobody.
 
     Returns:
         A :class:`GenerationResult` describing the run and its artifacts.
@@ -72,25 +100,33 @@ def generate_resume(
         ResumeLabError: If any stage fails. The run directory keeps whatever was
             produced before the failure.
     """
+    report = on_stage if on_stage is not None else _unwatched
     run = create_run(settings.runs_dir, label=_run_label(job_description))
     run.record_job_description(job_description)
 
     profile = load_candidate_profile(settings.candidate_profile_path)
+    report(GenerationStage.ANALYSIS)
     analysis = analyze_job_description(job_description, client=client)
     run.record_analysis(analysis)
 
+    report(GenerationStage.STRATEGY)
     strategy = build_transformation_strategy(profile, analysis, client=client)
     run.record_strategy(strategy)
 
+    report(GenerationStage.SUMMARY)
     summary = generate_summary(profile, analysis, strategy, client=client)
+    report(GenerationStage.EXPERIENCE)
     experiences = transform_experiences(profile, analysis, strategy, client=client)
     written = [bullet for entry in experiences for bullet in entry.bullets]
+    report(GenerationStage.PROJECTS)
     projects = transform_projects(
         profile, analysis, strategy, client=client, already_written=written
     )
     written += [bullet for project in projects for bullet in project.bullets]
+    report(GenerationStage.SKILLS)
     skills = transform_skills(profile, analysis, strategy, client=client, already_written=written)
 
+    report(GenerationStage.ASSEMBLY)
     resume = assemble_resume(
         profile,
         summary=summary,
@@ -98,6 +134,7 @@ def generate_resume(
         projects=projects,
         skills=skills,
     )
+    report(GenerationStage.RENDERING)
     resume, rendered, condensed = _render_to_fit(resume, run, client=client, settings=settings)
     run.record_resume(resume)
 
@@ -122,6 +159,10 @@ def generate_resume(
         metadata=metadata,
         condensed=condensed,
     )
+
+
+def _unwatched(stage: GenerationStage) -> None:
+    """The default reporter. A run nobody is watching reports to nobody."""
 
 
 def _render_to_fit(
