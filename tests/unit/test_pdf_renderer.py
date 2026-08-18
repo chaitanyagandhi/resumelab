@@ -451,10 +451,80 @@ def test_leading_is_proportional_to_font_size():
         assert style.leading > style.fontSize
 
 
-def test_bullets_hang_so_wrapped_lines_align():
-    bullet = build_stylesheet()["bullet"]
+def test_bullet_text_clears_the_marker_at_every_scale():
+    """The condition ReportLab actually applies, not the weaker one it implies.
 
-    assert bullet.leftIndent > bullet.bulletIndent
+    ``leftIndent > bulletIndent`` is necessary and nowhere near sufficient: ReportLab
+    starts the first line at ``bulletIndent + bulletWidth + 0.6 * bulletFontSize``
+    whenever that exceeds ``leftIndent``, and later lines at ``leftIndent``. An indent
+    that clears the marker's position but not its width loses the hanging indent.
+    """
+    for scale in LAYOUT_SCALES:
+        bullet = build_stylesheet(scale)["bullet"]
+        marker = pdfmetrics.stringWidth(
+            styles.BULLET_CHARACTER, bullet.bulletFontName, bullet.bulletFontSize
+        )
+        overrun = bullet.bulletIndent + marker + styles.BULLET_PADDING_RATIO * bullet.bulletFontSize
+
+        assert bullet.leftIndent == pytest.approx(overrun, abs=0.01)
+
+
+def test_a_wrapped_bullet_line_starts_where_its_first_line_does(tmp_path, generated_resume):
+    """Measured off the page, because this is invisible to every text assertion.
+
+    A bullet that does not wrap looks correct however the indents are set. The defect
+    only appears on the second line, and every long bullet has one.
+    """
+    long_bullet = (
+        "Owned end to end delivery of a reservation platform, carrying it from an "
+        "ambiguous specification through to production and serving ten thousand "
+        "people every day without a regression."
+    )
+    role = generated_resume.experiences[0].model_copy(update={"bullets": (long_bullet,) * 3})
+    resume = generated_resume.model_copy(update={"experiences": (role,)})
+
+    rendered = render_resume(resume, tmp_path / "wrapped.pdf").path
+    first_line, wrapped_line = _wrapped_bullet_columns(_text_runs(rendered))
+
+    assert wrapped_line == pytest.approx(first_line, abs=0.05)
+
+
+def _text_runs(path):
+    """Every text run on the page, with where it was actually drawn.
+
+    The text matrix alone is relative to the enclosing form, so it is composed with
+    the current transformation matrix to get a position on the page.
+    """
+    runs = []
+
+    def visit(text, cm, tm, _font_dict, _font_size):
+        if text.strip():
+            x = tm[4] * cm[0] + tm[5] * cm[2] + cm[4]
+            y = tm[4] * cm[1] + tm[5] * cm[3] + cm[5]
+            runs.append((round(y, 1), round(x, 2), text.strip()))
+
+    for page in PdfReader(path).pages:
+        page.extract_text(visitor_text=visit)
+    return runs
+
+
+def _wrapped_bullet_columns(runs):
+    """Where a bullet's first line starts, and where the line under it starts."""
+    lines = {}
+    for y, x, text in runs:
+        lines.setdefault(y, []).append((x, text))
+
+    descending = sorted(lines, reverse=True)
+    for index, y in enumerate(descending[:-1]):
+        parts = sorted(lines[y])
+        below = sorted(lines[descending[index + 1]])
+        if parts[0][1] != styles.BULLET_CHARACTER or len(parts) < 2:
+            continue
+        # A line carrying its own marker is the next bullet, and one starting at or
+        # left of the marker is a heading, not a line wrapped out of this bullet.
+        if below[0][1] != styles.BULLET_CHARACTER and below[0][0] > parts[0][0]:
+            return parts[1][0], below[0][0]
+    raise AssertionError("no wrapped bullet was found on the page")
 
 
 def _text_of(path):

@@ -161,8 +161,38 @@ correction here would push a round bullet up into the ascenders.
 """
 
 BULLET_INDENT = 9.0
-BULLET_TEXT_INDENT = 18.0
-"""Text hangs at this indent so wrapped bullet lines align under the first."""
+"""Where the marker sits, measured in from the text margin."""
+
+BULLET_PADDING_RATIO = 0.6
+"""ReportLab's own gap after a bullet, as a multiple of the bullet font size.
+
+Mirrored from ``reportlab.platypus.paragraph._handleBulletWidth``, which starts the
+first line of a bulleted paragraph at ``bulletIndent + bulletWidth + 0.6 *
+bulletFontSize`` whenever that exceeds ``leftIndent``, and every later line at
+``leftIndent``. ReportLab exposes no accessor for the factor, so it is named here.
+:func:`bullet_text_indent` has to agree with it exactly or the hanging indent is
+silently lost; a test measures a rendered page rather than trusting this number.
+"""
+
+
+def bullet_text_indent(scale: float = 1.0) -> float:
+    """Where bullet text hangs, measured from the glyph rather than guessed.
+
+    A round bullet at body size is wider than the 9pt gap the marker is given, so a
+    fixed indent smaller than ReportLab's own overrun leaves the first line starting
+    to the right of every line that follows it. That is invisible until a bullet
+    wraps, and every long bullet on the page wraps.
+
+    Args:
+        scale: The layout scale, applied here rather than by the caller because the
+            glyph is measured at the scaled size it will actually be drawn at.
+    """
+    register_fonts()
+    size = _scaled(BULLET_FONT_SIZE, scale)
+    # ReportLab ships no type information, so the measurement arrives untyped.
+    marker = float(pdfmetrics.stringWidth(BULLET_CHARACTER, GLYPH_FONT_BOLD, size))
+    return _scaled(BULLET_INDENT, scale) + marker + BULLET_PADDING_RATIO * size
+
 
 SEPARATOR_SIZE_DELTA = -3.0
 """Points below the surrounding text, so the separator stays a dot.
@@ -328,7 +358,7 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             fontName=FONT_REGULAR,
             fontSize=body,
             leading=_leading(body),
-            leftIndent=_scaled(BULLET_TEXT_INDENT, scale),
+            leftIndent=bullet_text_indent(scale),
             bulletIndent=_scaled(BULLET_INDENT, scale),
             bulletFontName=GLYPH_FONT_BOLD,
             bulletFontSize=_scaled(BULLET_FONT_SIZE, scale),
