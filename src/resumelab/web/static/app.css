@@ -6,11 +6,9 @@
  * and loads no fonts.
  */
 
-/* Every colour the page uses is a token, so a theme is a block of values rather
- * than a hunt through the stylesheet. The two exceptions are deliberate and live in
- * the document facsimile: it is a sheet of paper, and paper does not change colour
- * because the room did. Keeping it white also keeps it looking like the PDF beside
- * it, which is the whole point of the view. */
+/* Every colour the page uses is a token, so a theme is a block of values rather than
+ * a hunt through the stylesheet. The document facsimile is the one exception, and it
+ * has a palette of its own rather than an exemption from this one: see .doc__page. */
 
 :root {
   --page: #f5f5f6;
@@ -648,17 +646,30 @@ a.button:focus-visible {
   font-size: 11px;
 }
 
+/* The sheet carries its own palette, and it is the only part of the page that does.
+ * Paper does not change colour because the room did, and the PDF beside it is white
+ * whatever the theme, so a dark facsimile would make the two views disagree about
+ * the same document. Scoped here rather than written inline so every rule inside the
+ * sheet reads from the sheet: taking one of these from the theme is what turned the
+ * page into black text on a black background the first time. */
 .doc__page {
+  --paper: #ffffff;
+  --paper-ink: #111111;
+  --paper-faint: #9ca3af;
+  --paper-rule: #999999;
+  --paper-tint: #eef2ff;
+  --paper-ring: #c7d2fe;
+
   max-width: 816px; /* 8.5in */
   margin: 0 auto;
   padding: 48px 58px; /* the renderer's 0.5in and 0.6in margins */
-  background: var(--card);
+  background: var(--paper);
   border: 1px solid var(--line);
   border-radius: 4px;
   font-family: Helvetica, Arial, sans-serif;
   font-size: 12.7px; /* 9.5pt */
   line-height: 1.22;
-  color: #111111;
+  color: var(--paper-ink);
 }
 
 .doc__headerblock {
@@ -686,7 +697,7 @@ a.button:focus-visible {
 .doc__heading {
   margin: 0 0 4px;
   padding-bottom: 1px;
-  border-bottom: 0.8px solid #999999;
+  border-bottom: 0.8px solid var(--paper-rule);
   font-size: 12.7px;
   font-weight: 700;
   letter-spacing: 0.02em;
@@ -759,16 +770,16 @@ a.button:focus-visible {
 }
 
 .doc__edit:hover {
-  box-shadow: 0 0 0 2px var(--hint-bg);
+  box-shadow: 0 0 0 2px var(--paper-tint);
 }
 
 .doc__edit:focus {
-  box-shadow: 0 0 0 2px var(--hint-ring);
+  box-shadow: 0 0 0 2px var(--paper-ring);
 }
 
 .doc__edit:empty::before {
   content: attr(data-hint);
-  color: var(--ink-faint);
+  color: var(--paper-faint);
   font-style: normal;
   font-weight: 400;
 }
