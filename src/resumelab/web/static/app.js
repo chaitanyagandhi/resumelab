@@ -76,7 +76,8 @@ const ui = {
   preview: el("preview"),
   placeholder: el("preview-placeholder"),
   editor: el("editor"),
-  mode: el("mode"),
+  document: el("document"),
+  views: el("views"),
   saveState: el("save-state"),
   download: el("download"),
   runLabel: el("run-label"),
@@ -90,7 +91,8 @@ const state = {
   resume: null,
   /** Whether this run has an edit saved, which is what the preview should show. */
   hasEdit: false,
-  mode: "preview",
+  /** "preview", "fields", or "document". Null until a run is open. */
+  view: null,
 };
 
 let saveTimer = null;
@@ -223,13 +225,14 @@ function showRun(runId) {
   state.runId = runId;
   state.resume = null;
   state.hasEdit = false;
+  state.view = null;
   ui.runLabel.textContent = runId;
-  ui.mode.hidden = false;
+  ui.views.hidden = false;
   ui.saveState.hidden = true;
   // In the address bar so a reload reopens the run rather than losing it. The run
   // survives this page; without it here, the page's only reference to it would not.
   location.hash = `run=${encodeURIComponent(runId)}`;
-  showPreview();
+  setView("preview");
 }
 
 /** Reopen whatever run the address bar names. */
@@ -249,46 +252,65 @@ function pdfPath() {
   return `/api/runs/${run}/${name}?v=${Date.now()}`;
 }
 
-function showPreview() {
-  state.mode = "preview";
-  const url = pdfPath();
-  ui.preview.src = url;
-  ui.download.href = url;
-  ui.preview.hidden = false;
-  ui.download.hidden = false;
-  ui.editor.hidden = true;
-  ui.placeholder.hidden = true;
-  ui.mode.textContent = "Edit like a doc";
-}
-
-async function showEditor() {
+/** Load the resume being edited, once. Both editors work on the same object. */
+async function ensureResume() {
+  if (state.resume !== null) {
+    return true;
+  }
   try {
-    if (state.resume === null) {
-      state.resume = await request(
-        `/api/runs/${encodeURIComponent(state.runId)}/${state.hasEdit ? "edit" : "resume"}`,
-      );
-    }
+    state.resume = await request(
+      `/api/runs/${encodeURIComponent(state.runId)}/${state.hasEdit ? "edit" : "resume"}`,
+    );
+    return true;
   } catch (error) {
     showError(error.message);
+    return false;
+  }
+}
+
+/**
+ * Show one of the three views.
+ *
+ * The two editors are alternative ways into the same resume object, not two
+ * documents: switching between them carries the edits across untouched, because
+ * there is only ever one thing being edited.
+ */
+async function setView(view) {
+  if (state.view !== null && state.view !== "preview") {
+    // Leaving an editor with a keystroke still in the debounce would show a PDF one
+    // edit behind the screen, and would rebuild the other view from stale content.
+    await flushSave();
+  }
+  if (view !== "preview" && !(await ensureResume())) {
     return;
   }
 
-  state.mode = "edit";
-  buildEditor();
-  ui.editor.hidden = false;
-  ui.preview.hidden = true;
+  state.view = view;
   ui.placeholder.hidden = true;
-  ui.mode.textContent = "Back to preview";
+  ui.preview.hidden = view !== "preview";
+  ui.editor.hidden = view !== "fields";
+  ui.document.hidden = view !== "document";
+
+  if (view === "preview") {
+    const url = pdfPath();
+    ui.preview.src = url;
+    ui.download.href = url;
+    ui.download.hidden = false;
+  } else if (view === "fields") {
+    buildEditor();
+  } else {
+    buildDocument();
+  }
+
+  for (const button of ui.views.querySelectorAll("button")) {
+    button.setAttribute("aria-pressed", String(button.dataset.view === view));
+  }
 }
 
-ui.mode.addEventListener("click", async () => {
-  if (state.mode === "edit") {
-    // Leaving the editor with a keystroke still in the debounce would show a PDF
-    // that is one edit behind what is on screen.
-    await flushSave();
-    showPreview();
-  } else {
-    await showEditor();
+ui.views.addEventListener("click", async (event) => {
+  const view = event.target.dataset?.view;
+  if (view !== undefined && view !== state.view) {
+    await setView(view);
   }
 });
 
@@ -546,16 +568,26 @@ function onFieldInput(event) {
   scheduleSave();
 }
 
-/** Adding or removing changes every path after it, so the editor is rebuilt. */
+/** Adding or removing changes every path after it, so the view is rebuilt. */
 function rebuildAndSave() {
-  buildEditor();
+  if (state.view === "document") {
+    buildDocument();
+  } else {
+    buildEditor();
+  }
   scheduleSave();
 }
 
-/** Commas separate; blanks are dropped rather than saved as empty entries. */
+/**
+ * Split a list field.
+ *
+ * Either separator is accepted, because the two editors show these differently: the
+ * fields editor lists them by comma, the document draws them the way the page does.
+ * Blanks are dropped rather than saved as empty entries.
+ */
 function asList(raw) {
   return raw
-    .split(",")
+    .split(/[,·]/)
     .map((part) => part.trim())
     .filter((part) => part.length > 0);
 }
@@ -568,6 +600,266 @@ function writePath(root, path, value) {
   const parts = path.split(".");
   const parent = parts.slice(0, -1).reduce((node, part) => node[part], root);
   parent[parts.at(-1)] = value;
+}
+
+// --- the document ---------------------------------------------------------
+//
+// A facsimile of the page, laid out to look like the resume and editable in place.
+// Every editable run is bound to a field of the same resume the other editor works
+// on, so what leaves here is structured content and never markup. The PDF is still
+// drawn by the renderer; this is a way of typing, not a second document.
+
+function buildDocument() {
+  const resume = state.resume;
+  const page = document.createElement("article");
+  page.className = "doc__page";
+
+  page.append(
+    docHeader(resume),
+    docSection("Summary", [bound("summary", { tag: "p", className: "doc__body" })]),
+    docSection(
+      "Education",
+      resume.education.flatMap((_entry, index) => docEducation(index)),
+    ),
+    docSection(
+      "Experience",
+      resume.experiences.flatMap((role, index) => docExperience(role, index)),
+    ),
+    docSection(
+      "Projects",
+      resume.projects.flatMap((project, index) => docProject(project, index)),
+    ),
+    docSection("Skills", [
+      bound("skills", { tag: "p", className: "doc__body", list: true, separator: " · " }),
+    ]),
+  );
+  if (resume.achievements.length > 0) {
+    page.append(docSection("Achievements", [docBullets("achievements", resume.achievements)]));
+  }
+
+  // The caveat is the panel's own, not the page's, so it survives every rebuild.
+  ui.document.replaceChildren(ui.document.querySelector(".doc__caveat"), page);
+}
+
+/** An editable run bound to one field of the resume. */
+function bound(path, { tag = "span", className = "", list = false, separator = ", ", hint = "" } = {}) {
+  const node = document.createElement(tag);
+  node.className = `doc__edit ${className}`.trim();
+  node.contentEditable = "true";
+  node.dataset.path = path;
+  node.dataset.list = String(list);
+  node.dataset.separator = separator;
+  if (hint) {
+    node.dataset.hint = hint;
+  }
+
+  const value = readPath(state.resume, path);
+  node.textContent = list ? (value ?? []).join(separator) : (value ?? "");
+
+  node.addEventListener("input", onDocumentInput);
+  node.addEventListener("paste", onDocumentPaste);
+  node.addEventListener("keydown", onDocumentKeydown);
+  return node;
+}
+
+/** Text the page draws but the resume does not hold, such as a label or a comma. */
+function fixed(text, className = "") {
+  const node = document.createElement("span");
+  node.className = `doc__fixed ${className}`.trim();
+  node.textContent = text;
+  return node;
+}
+
+function onDocumentInput(event) {
+  const node = event.currentTarget;
+  // textContent, never innerHTML: whatever the browser did to the markup, the field
+  // this is bound to is a string, and that is all that is read back out.
+  const raw = node.textContent;
+  writePath(state.resume, node.dataset.path, node.dataset.list === "true" ? asList(raw) : raw);
+  scheduleSave();
+}
+
+/** Paste as plain text. A pasted heading would otherwise arrive with its markup. */
+function onDocumentPaste(event) {
+  event.preventDefault();
+  const text = event.clipboardData.getData("text/plain").replace(/\s+/g, " ").trim();
+  // Deprecated, and still the only insertion that the browser's own undo can see.
+  document.execCommand("insertText", false, text);
+}
+
+function onDocumentKeydown(event) {
+  const node = event.currentTarget;
+  const bullet = /^(.*\.bullets|achievements)\.(\d+)$/.exec(node.dataset.path);
+
+  if (event.key === "Enter") {
+    // Never let contenteditable invent markup: a field holds a line, not a document.
+    event.preventDefault();
+    if (bullet !== null) {
+      const [, listPath, index] = bullet;
+      const at = Number(index) + 1;
+      readPath(state.resume, listPath).splice(at, 0, "");
+      rebuildAndSave();
+      focusBound(`${listPath}.${at}`);
+    }
+    return;
+  }
+
+  // Backspace at the start of an empty bullet removes it, the way a list behaves in
+  // any editor. Only when empty, so it can never eat text that was typed.
+  if (event.key === "Backspace" && bullet !== null && node.textContent === "") {
+    event.preventDefault();
+    const [, listPath, index] = bullet;
+    const items = readPath(state.resume, listPath);
+    if (items.length > 1) {
+      items.splice(Number(index), 1);
+      rebuildAndSave();
+      focusBound(`${listPath}.${Math.max(Number(index) - 1, 0)}`);
+    }
+  }
+}
+
+/** Put the caret at the end of a field, after the view was rebuilt under it. */
+function focusBound(path) {
+  const node = ui.document.querySelector(`[data-path="${path}"]`);
+  if (node === null) {
+    return;
+  }
+  node.focus();
+  const range = document.createRange();
+  range.selectNodeContents(node);
+  range.collapse(false);
+  const selection = window.getSelection();
+  selection.removeAllRanges();
+  selection.addRange(range);
+}
+
+function docHeader(resume) {
+  const header = document.createElement("header");
+  header.className = "doc__headerblock";
+
+  const contact = document.createElement("p");
+  contact.className = "doc__contact";
+  const fields = [
+    ["personal.location", "Location"],
+    ["personal.email", "Email"],
+    ["personal.phone", "Phone"],
+    ["personal.linkedin", "LinkedIn"],
+    ["personal.github", "GitHub"],
+  ];
+  fields.forEach(([path, hint], index) => {
+    if (index > 0) {
+      contact.append(fixed(" · "));
+    }
+    contact.append(bound(path, { hint }));
+  });
+
+  header.append(bound("personal.name", { tag: "h1", className: "doc__name" }), contact);
+  return header;
+}
+
+function docSection(title, children) {
+  const section = document.createElement("section");
+  section.className = "doc__section";
+  const heading = document.createElement("h2");
+  heading.className = "doc__heading";
+  heading.textContent = title.toUpperCase();
+  section.append(heading, ...children);
+  return section;
+}
+
+/** A line with content on the left and a date or a figure on the right. */
+function docRow(left, right, className = "") {
+  const row = document.createElement("div");
+  row.className = `doc__row ${className}`.trim();
+  const leading = document.createElement("div");
+  leading.className = "doc__rowleft";
+  leading.append(...left);
+  row.append(leading, right);
+  return row;
+}
+
+/** Two fields, drawn as the one range the page shows. */
+function docDates(prefix) {
+  const range = document.createElement("div");
+  range.className = "doc__right";
+  range.append(
+    bound(`${prefix}.start_date`, { hint: "Start" }),
+    fixed(" – "),
+    bound(`${prefix}.end_date`, { hint: "End" }),
+  );
+  return range;
+}
+
+function docEducation(index) {
+  const at = `education.${index}`;
+  const gpa = document.createElement("div");
+  gpa.className = "doc__right doc__detail";
+  gpa.append(fixed("GPA: "), bound(`${at}.gpa`, { hint: "GPA" }));
+
+  return [
+    docRow(
+      [
+        bound(`${at}.institution`, { className: "doc__strong" }),
+        fixed(" · "),
+        bound(`${at}.location`, { hint: "Location" }),
+      ],
+      docDates(at),
+    ),
+    docRow(
+      [
+        bound(`${at}.degree`, { className: "doc__em" }),
+        fixed(" "),
+        bound(`${at}.field`, { className: "doc__em", hint: "Field" }),
+      ],
+      gpa,
+      "doc__detail",
+    ),
+  ];
+}
+
+function docExperience(role, index) {
+  const at = `experiences.${index}`;
+  return [
+    docRow(
+      [
+        bound(`${at}.title`, { className: "doc__strong" }),
+        fixed(", "),
+        bound(`${at}.company`, { className: "doc__em" }),
+      ],
+      docDates(at),
+    ),
+    docBullets(`${at}.bullets`, role.bullets),
+  ];
+}
+
+function docProject(project, index) {
+  const at = `projects.${index}`;
+  const date = document.createElement("div");
+  date.className = "doc__right";
+  date.append(bound(`${at}.date`, { hint: "Date" }));
+
+  return [
+    docRow(
+      [
+        bound(`${at}.name`, { className: "doc__strong" }),
+        fixed(" - "),
+        bound(`${at}.subtitle`, { hint: "Subtitle" }),
+        fixed(" / "),
+        bound(`${at}.technologies`, { className: "doc__em", list: true, hint: "Technologies" }),
+      ],
+      date,
+    ),
+    docBullets(`${at}.bullets`, project.bullets),
+  ];
+}
+
+function docBullets(path, values) {
+  const list = document.createElement("ul");
+  list.className = "doc__bullets";
+  values.forEach((_value, index) =>
+    list.append(bound(`${path}.${index}`, { tag: "li", className: "doc__bulletline" })),
+  );
+  return list;
 }
 
 // --- saving ---------------------------------------------------------------

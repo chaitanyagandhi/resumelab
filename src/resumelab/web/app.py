@@ -18,9 +18,10 @@ before anything is opened. A run that does not resolve inside it does not exist.
 from __future__ import annotations
 
 import logging
+from collections.abc import Awaitable, Callable
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, model_validator
@@ -175,6 +176,23 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     @app.get("/", include_in_schema=False)
     def index() -> FileResponse:
         return FileResponse(INDEX_FILE)
+
+    @app.middleware("http")
+    async def revalidate_front_end(
+        request: Request,
+        call_next: Callable[[Request], Awaitable[Response]],
+    ) -> Response:
+        """Stop the browser serving a stale page after the front end changes.
+
+        ``no-cache`` is revalidate-before-use, not do-not-store: the browser still
+        keeps the file and still gets a 304 when nothing moved. Without it a cached
+        shell outlives an edit to the page, and the symptom - new code on disk,
+        old behaviour on screen - costs far more to diagnose than the request saves.
+        """
+        response = await call_next(request)
+        if request.url.path == "/" or request.url.path.startswith("/static/"):
+            response.headers["cache-control"] = "no-cache"
+        return response
 
     # Mounted after the routes above, so a static file can never shadow the API.
     app.mount("/static", StaticFiles(directory=STATIC_DIRECTORY), name="static")

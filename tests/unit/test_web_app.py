@@ -391,6 +391,18 @@ def test_an_unknown_path_is_not_found(client):
     assert client.get("/nothing-here").status_code == 404
 
 
+@pytest.mark.parametrize("path", ["/", "/static/app.js", "/static/app.css"])
+def test_the_front_end_is_revalidated_rather_than_reused(client, path):
+    """A cached shell outlives an edit to the page, and the symptom is a change that
+    is on disk, served by the server, and absent from the screen."""
+    assert client.get(path).headers["cache-control"] == "no-cache"
+
+
+def test_the_api_is_left_to_its_own_caching(client):
+    """The rule is about the front end; an API response has no shell to go stale."""
+    assert "cache-control" not in client.get("/api/health").headers
+
+
 def test_a_static_file_cannot_shadow_the_api(client):
     """The mount is registered last, so /api stays the API whatever lands in static/."""
     assert client.get("/api/health").json()["status"] == "ok"

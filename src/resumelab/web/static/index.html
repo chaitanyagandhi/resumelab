@@ -68,7 +68,11 @@
         <div class="previewbar">
           <span class="previewbar__run" data-role="run-label"></span>
           <span class="savestate" data-role="save-state" hidden></span>
-          <button class="button" data-role="mode" type="button" hidden>Edit like a doc</button>
+          <div class="views" data-role="views" role="group" aria-label="View" hidden>
+            <button type="button" data-view="preview">Preview</button>
+            <button type="button" data-view="document">Edit like a doc</button>
+            <button type="button" data-view="fields">Edit fields</button>
+          </div>
           <a class="button" data-role="download" download hidden>Download PDF</a>
         </div>
         <div class="placeholder" data-role="preview-placeholder">
@@ -76,6 +80,12 @@
         </div>
         <iframe class="preview" data-role="preview" title="Rendered resume" hidden></iframe>
         <div class="editor" data-role="editor" hidden></div>
+        <div class="doc" data-role="document" hidden>
+          <p class="doc__caveat">
+            A working copy you can type into. The PDF is drawn separately and is the
+            layout that counts, so line breaks and spacing will differ slightly here.
+          </p>
+        </div>
       </section>
     </main>
 
