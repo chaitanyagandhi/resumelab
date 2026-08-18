@@ -83,7 +83,55 @@ const ui = {
   runLabel: el("run-label"),
   statusDot: el("status-dot"),
   statusText: el("status-text"),
+  theme: el("theme"),
 };
+
+// --- theme ----------------------------------------------------------------
+//
+// Three states, not two: light, dark, and no opinion. Until the toggle is used the
+// page follows the system, which is what someone who set a system preference
+// already asked for. Pressing it commits to one and remembers that.
+
+const THEME_KEY = "resumelab.theme";
+
+function currentTheme() {
+  return (
+    document.documentElement.dataset.theme ??
+    (window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light")
+  );
+}
+
+function applyTheme(theme) {
+  document.documentElement.dataset.theme = theme;
+  const dark = theme === "dark";
+  ui.theme.textContent = dark ? "☀" : "☾";
+  ui.theme.setAttribute("aria-label", `Switch to the ${dark ? "light" : "dark"} theme`);
+  ui.theme.title = ui.theme.getAttribute("aria-label");
+  try {
+    localStorage.setItem(THEME_KEY, theme);
+  } catch {
+    // Storage refused; the theme still holds for this page.
+  }
+}
+
+ui.theme.addEventListener("click", () => {
+  applyTheme(currentTheme() === "dark" ? "light" : "dark");
+});
+
+// The button has to say what it will do before it is ever pressed, and that depends
+// on the system preference when nothing was stored.
+ui.theme.textContent = currentTheme() === "dark" ? "☀" : "☾";
+ui.theme.title = `Switch to the ${currentTheme() === "dark" ? "light" : "dark"} theme`;
+ui.theme.setAttribute("aria-label", ui.theme.title);
+
+// Follow the system while it is still the thing being followed.
+window
+  .matchMedia("(prefers-color-scheme: dark)")
+  .addEventListener("change", (event) => {
+    if (document.documentElement.dataset.theme === undefined) {
+      ui.theme.textContent = event.matches ? "☀" : "☾";
+    }
+  });
 
 const state = {
   runId: null,
@@ -209,7 +257,7 @@ function readPosting() {
 async function pollUntilSettled(jobId) {
   for (;;) {
     const job = await request(`/api/jobs/${encodeURIComponent(jobId)}`);
-    showStages(job.stage);
+    showStages(job.stage, job.state);
     if (job.state !== "running") {
       return job;
     }
@@ -903,7 +951,7 @@ async function save() {
 
 // --- small bits of chrome -------------------------------------------------
 
-function showStages(current) {
+function showStages(current, runState = "running") {
   const reached = STAGES.findIndex(([name]) => name === current);
   ui.stages.hidden = false;
   ui.stages.replaceChildren(
@@ -911,19 +959,31 @@ function showStages(current) {
       const item = document.createElement("li");
       item.className = "stages__item";
       item.textContent = label;
-      item.dataset.state = stageState(index, reached);
+      item.dataset.state = stageState(index, reached, runState);
       item.dataset.stage = name;
       return item;
     }),
   );
 }
 
-/** Before the first stage is reported, nothing is done and nothing is current. */
-function stageState(index, reached) {
+/**
+ * How one stage should read, given how far the run got and how it ended.
+ *
+ * A finished run has no current stage. The last one reported is where the run was
+ * when it stopped, which for a completed run means it finished there rather than
+ * that it is still going: leaving it marked current is a spinner that never stops.
+ */
+function stageState(index, reached, runState) {
+  if (runState === "completed") {
+    return "done";
+  }
   if (index < reached) {
     return "done";
   }
-  return index === reached ? "current" : "pending";
+  if (index !== reached) {
+    return "pending";
+  }
+  return runState === "failed" ? "failed" : "current";
 }
 
 function setBusy(busy) {

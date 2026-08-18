@@ -5,13 +5,31 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>ResumeLab</title>
     <link rel="stylesheet" href="/static/app.css" />
+    <script>
+      // Inline and before the stylesheet is applied, on purpose. A module script is
+      // deferred, so choosing the theme there would paint the light page first and
+      // then correct it, which reads as a flash every single load.
+      try {
+        const saved = localStorage.getItem("resumelab.theme");
+        if (saved) {
+          document.documentElement.dataset.theme = saved;
+        }
+      } catch {
+        // Private browsing can refuse storage. The system preference still applies.
+      }
+    </script>
   </head>
   <body>
     <header class="masthead">
-      <h1>Resume Generator</h1>
-      <p class="masthead__subtitle">
-        Generate a resume tailored to a job posting, then edit it in place.
-      </p>
+      <div>
+        <h1>Resume Generator</h1>
+        <p class="masthead__subtitle">
+          Generate a resume tailored to a job posting, then edit it in place.
+        </p>
+      </div>
+      <button class="theme" type="button" data-role="theme" aria-label="Switch theme">
+        ☾
+      </button>
     </header>
 
     <p class="disclaimer" role="note">
