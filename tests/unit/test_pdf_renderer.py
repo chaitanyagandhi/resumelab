@@ -761,6 +761,22 @@ def test_the_project_stack_uses_its_own_separator(extracted, generated_resume):
     assert styles.PROJECT_STACK_SEPARATOR.strip() in extracted
 
 
+def test_projects_are_drawn_in_the_order_they_are_given(tmp_path, generated_resume):
+    """Which project leads is an editorial choice, made by ordering the list.
+
+    The editor reorders that list and re-renders; nothing else carries the intent, so
+    a renderer that sorted or grouped projects would silently discard it.
+    """
+    reversed_projects = tuple(reversed(generated_resume.projects))
+    resume = generated_resume.model_copy(update={"projects": reversed_projects})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "reordered.pdf").path))
+
+    assert [project.name for project in reversed_projects] == sorted(
+        (project.name for project in reversed_projects), key=text.index
+    )
+
+
 def test_a_project_without_technologies_still_renders_its_heading(tmp_path, generated_resume):
     bare = generated_resume.projects[0].model_copy(update={"technologies": ()})
     resume = generated_resume.model_copy(update={"projects": (bare,)})

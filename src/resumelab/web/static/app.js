@@ -320,11 +320,17 @@ function buildEditor() {
     section(
       "Projects",
       resume.projects.map((project, index) =>
-        entry(project.name || `Project ${index + 1}`, [
-          grid(PROJECT_FIELDS.map(([label, key]) => field(label, `projects.${index}.${key}`))),
-          field("Technologies", `projects.${index}.technologies`, { list: true }),
-          bullets(`projects.${index}.bullets`, project.bullets),
-        ]),
+        entry(
+          project.name || `Project ${index + 1}`,
+          [
+            grid(PROJECT_FIELDS.map(([label, key]) => field(label, `projects.${index}.${key}`))),
+            field("Technologies", `projects.${index}.technologies`, { list: true }),
+            bullets(`projects.${index}.bullets`, project.bullets),
+          ],
+          // Which project leads is a real editorial choice, and the only way to make
+          // it today is to retype three of them into each other's fields.
+          { reorder: { path: "projects", index, total: resume.projects.length } },
+        ),
       ),
     ),
     section("Skills", [
@@ -344,14 +350,122 @@ function section(title, children) {
   return node;
 }
 
-function entry(title, children) {
+/** One entry card. Given ``reorder``, it can be dragged within its own list. */
+function entry(title, children, { reorder = null } = {}) {
   const node = document.createElement("div");
   node.className = "ed-entry";
+
+  const header = document.createElement("div");
+  header.className = "ed-entry__header";
   const heading = document.createElement("p");
   heading.className = "ed-entry__title";
   heading.textContent = title;
-  node.append(heading, ...children.flat());
+  header.append(heading);
+
+  if (reorder !== null) {
+    header.prepend(dragHandle(node, reorder));
+    acceptDrops(node, reorder);
+  }
+
+  node.append(header, ...children.flat());
   return node;
+}
+
+/** The entry being dragged, or null. Only one can be in flight at a time. */
+let dragging = null;
+
+function dragHandle(card, spec) {
+  const handle = document.createElement("button");
+  handle.type = "button";
+  handle.className = "ed-handle";
+  handle.textContent = "⠿";
+  handle.dataset.entry = `${spec.path}.${spec.index}`;
+  handle.title = "Drag to reorder, or focus and use the arrow keys";
+  handle.setAttribute("aria-label", `Reorder, currently ${spec.index + 1} of ${spec.total}`);
+
+  // The card becomes draggable only while the handle is held. Marking it draggable
+  // outright would take dragging away from the text inside its own fields.
+  handle.addEventListener("pointerdown", () => {
+    card.draggable = true;
+  });
+  handle.addEventListener("keydown", (event) => {
+    const step = { ArrowUp: -1, ArrowDown: 1 }[event.key];
+    if (step === undefined) {
+      return;
+    }
+    event.preventDefault();
+    moveEntry(spec.path, spec.index, spec.index + step);
+  });
+
+  card.addEventListener("dragstart", (event) => {
+    dragging = spec;
+    card.classList.add("is-dragging");
+    event.dataTransfer.effectAllowed = "move";
+    // Firefox starts no drag at all unless the transfer carries something.
+    event.dataTransfer.setData("text/plain", String(spec.index));
+  });
+  card.addEventListener("dragend", () => {
+    card.draggable = false;
+    dragging = null;
+    card.classList.remove("is-dragging");
+    clearDropMarks();
+  });
+
+  return handle;
+}
+
+function acceptDrops(card, spec) {
+  card.addEventListener("dragover", (event) => {
+    if (dragging === null || dragging.path !== spec.path) {
+      return;
+    }
+    // Without this the browser refuses the drop, silently.
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "move";
+    card.dataset.drop = pastHalfway(event, card) ? "after" : "before";
+  });
+
+  card.addEventListener("dragleave", () => {
+    delete card.dataset.drop;
+  });
+
+  card.addEventListener("drop", (event) => {
+    if (dragging === null || dragging.path !== spec.path) {
+      return;
+    }
+    event.preventDefault();
+    const from = dragging.index;
+    dragging = null;
+    // An insertion point, not a destination: dropping below the third card means
+    // "fourth position", which is only index 3 once the dragged card is gone.
+    const insertAt = spec.index + (pastHalfway(event, card) ? 1 : 0);
+    moveEntry(spec.path, from, insertAt > from ? insertAt - 1 : insertAt);
+  });
+}
+
+function pastHalfway(event, card) {
+  const box = card.getBoundingClientRect();
+  return event.clientY > box.top + box.height / 2;
+}
+
+/** Move an entry within its list, then redraw and save. */
+function moveEntry(path, from, to) {
+  const items = readPath(state.resume, path);
+  if (to < 0 || to >= items.length || to === from) {
+    return;
+  }
+  const [moved] = items.splice(from, 1);
+  items.splice(to, 0, moved);
+  rebuildAndSave();
+  // The editor was rebuilt, so the handle that was focused no longer exists.
+  // Following the entry is what makes reordering by keyboard usable at all.
+  ui.editor.querySelector(`.ed-handle[data-entry="${path}.${to}"]`)?.focus();
+}
+
+function clearDropMarks() {
+  for (const node of ui.editor.querySelectorAll("[data-drop]")) {
+    delete node.dataset.drop;
+  }
 }
 
 function grid(children) {

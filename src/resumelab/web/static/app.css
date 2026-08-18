@@ -339,12 +339,56 @@ a.button:focus-visible {
   padding: 12px;
   border: 1px solid var(--line);
   border-radius: 8px;
+  background: var(--card);
+}
+
+.ed-entry__header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
 }
 
 .ed-entry__title {
-  margin: 0 0 10px;
+  margin: 0;
   font-size: 12.5px;
   font-weight: 600;
+}
+
+/* --- reordering entries ------------------------------------------------ */
+
+.ed-handle {
+  flex: none;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--ink-faint);
+  font-size: 14px;
+  line-height: 1;
+  cursor: grab;
+}
+
+.ed-handle:hover {
+  color: var(--ink);
+}
+
+.ed-handle:active {
+  cursor: grabbing;
+}
+
+.ed-entry.is-dragging {
+  opacity: 0.4;
+}
+
+/* An insertion line on the edge the card would land against, rather than a
+ * placeholder gap: the cards are tall, and opening one would push the rest of the
+ * list out from under the cursor. */
+.ed-entry[data-drop="before"] {
+  box-shadow: inset 0 2px 0 var(--accent);
+}
+
+.ed-entry[data-drop="after"] {
+  box-shadow: inset 0 -2px 0 var(--accent);
 }
 
 .ed-grid {
