@@ -90,19 +90,25 @@ reference resume it was measured against, and the renderer paid for them by drop
 a layout scale.
 """
 
-MAX_BULLET_CHARACTERS = 118
-"""The backstop, a little over what a line holds.
+ONE_LINE_BULLET_CHARACTERS = 118
+"""What a bullet line actually holds, and what the layout wants.
 
-Not the goal. The goal is :data:`TARGET_BULLET_CHARACTERS`; this is the point past
-which a bullet is sent back to be rewritten. The gap between the two is deliberate:
-a cap set at the target would reject bullets that overshoot by a word, and spend an
-API call on each of them, which is the trade the house rule exists to avoid.
+Not enforced by rejection. A bullet past this wraps, which costs the page a line and
+nothing else; the renderer tightens, and the condenser shortens if it has to. This is
+the number the prompts describe and the condenser aims at.
+"""
 
-It was 220 for most of this project's life, described as "roughly two lines" - which
-it is, and which is why every run overflowed, spent a condensing call, and still
-landed at the tightest layout the renderer permits. At 130 it was still above what a
-line holds, and a model writing to the limit wrapped most of its bullets by a word or
-two. A cap the model can write to and still fit is worth more than the slack.
+MAX_BULLET_CHARACTERS = 320
+"""The pathology ceiling, and the only length that is ever rejected.
+
+Roughly three lines. A model that returns this much after being asked for one line
+has misread the schema rather than overshot it, which is a content error and worth
+the repair call.
+
+It is deliberately nowhere near :data:`ONE_LINE_BULLET_CHARACTERS`. A cap set at the
+line length ended a run: four attempts spent on a bullet of 131 characters against a
+limit of 118, which is exactly the trade the house rule forbids. Length is a layout
+constraint, and a layout constraint is never worth an API call.
 """
 
 _LIST_MARKER = re.compile("^\\s*(?:[-*\\u2022\\u2013\\u2014]|\\d+[.)])\\s+")
@@ -133,9 +139,37 @@ class ResumeLimits(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     summary_max_characters: int = MAX_SUMMARY_CHARACTERS
-    bullet_max_characters: int = MAX_BULLET_CHARACTERS
+    bullet_max_characters: int = ONE_LINE_BULLET_CHARACTERS
     experience_bullet_count: int = REQUIRED_EXPERIENCE_BULLET_COUNT
     project_bullet_count: int = REQUIRED_PROJECT_BULLET_COUNT
+
+
+_SENTENCE_BREAK = re.compile(r"(?<=[.!?])\s+")
+
+
+def _drop_trailing_sentences(text: str, budget: int, floor: int) -> str:
+    """Shorten ``text`` toward ``budget`` by dropping whole trailing sentences.
+
+    Whole sentences only. Cutting at a character count is how a bullet ends up
+    reading "... 25,000+ transactions/day via.", which states less than the long
+    version and looks like a bug rather than an edit.
+
+    Most bullets are a single sentence, so usually there is nothing to drop and the
+    text comes back unchanged. That is the intended outcome: it wraps onto a second
+    line, the renderer tightens, and the run continues. Nothing here rejects.
+    """
+    if len(text) <= budget:
+        return text
+    sentences = _SENTENCE_BREAK.split(text)
+    while len(sentences) > 1:
+        shorter = " ".join(sentences[:-1])
+        if len(shorter) < floor:
+            break
+        sentences = sentences[:-1]
+        if len(shorter) <= budget:
+            return shorter
+    kept = " ".join(sentences)
+    return kept if len(kept) >= floor else text
 
 
 def _normalize_summary(value: str) -> str:
@@ -152,11 +186,9 @@ def _normalize_summary(value: str) -> str:
         raise ValueError(
             f"must be at least {MIN_SUMMARY_CHARACTERS} characters, got {len(collapsed)}"
         )
-    if len(collapsed) > MAX_SUMMARY_CHARACTERS:
-        raise ValueError(
-            f"must be at most {MAX_SUMMARY_CHARACTERS} characters, got {len(collapsed)}"
-        )
-    return collapsed
+    # Same rule as the bullets: shorten cleanly if possible, never reject. A summary
+    # rejected at 308 characters against a limit of 300 has ended a run before.
+    return _drop_trailing_sentences(collapsed, MAX_SUMMARY_CHARACTERS, MIN_SUMMARY_CHARACTERS)
 
 
 SummaryText = Annotated[str, AfterValidator(_normalize_summary)]
@@ -184,6 +216,12 @@ def _normalize_bullet(value: str) -> str:
         raise ValueError(
             f"must be at least {MIN_BULLET_CHARACTERS} characters, got {len(collapsed)}"
         )
+    # Length is a layout constraint. Shorten it here if that can be done cleanly,
+    # otherwise let it wrap: a second line costs the page a line, and a rejection
+    # costs an API call and can cost the whole run.
+    collapsed = _drop_trailing_sentences(
+        collapsed, ONE_LINE_BULLET_CHARACTERS, MIN_BULLET_CHARACTERS
+    )
     if len(collapsed) > MAX_BULLET_CHARACTERS:
         raise ValueError(
             f"must be at most {MAX_BULLET_CHARACTERS} characters, got {len(collapsed)}"
@@ -231,10 +269,9 @@ def _normalize_subtitle(value: str) -> str:
         raise ValueError(
             f"must be at least {MIN_SUBTITLE_CHARACTERS} characters, got {len(collapsed)}"
         )
-    if len(collapsed) > MAX_SUBTITLE_CHARACTERS:
-        raise ValueError(
-            f"must be at most {MAX_SUBTITLE_CHARACTERS} characters, got {len(collapsed)}"
-        )
+    # Not rejected either. An over-long subtitle is absorbed by the heading trim,
+    # which drops technologies until the line fits, and a heading that still will not
+    # fit wraps. Both cost less than losing the run.
     return collapsed
 
 

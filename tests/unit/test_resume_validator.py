@@ -244,11 +244,29 @@ def test_a_tighter_summary_budget_is_enforced(generated_resume):
         validate_resume(generated_resume, limits)
 
 
-def test_a_tighter_bullet_budget_is_enforced(generated_resume):
+def test_a_bullet_over_the_line_budget_does_not_fail_the_resume(generated_resume, caplog):
+    """The budget is what the condenser aims at, not a condition of rendering.
+
+    Failing here would throw away a finished resume because one bullet takes two
+    lines. It is noted in the log and the run continues.
+    """
     limits = ResumeLimits(bullet_max_characters=60)
 
-    with pytest.raises(ResumeValidationError, match="expected between 40 and 60"):
+    with caplog.at_level("INFO", logger="resumelab.validation.resume_validator"):
         validate_resume(generated_resume, limits)
+
+    assert "will wrap" in caplog.text
+
+
+def test_a_bullet_past_the_pathology_ceiling_still_fails(generated_resume):
+    """Three lines of prose in one bullet is a misread schema, not an overshoot."""
+    huge = generated_resume.experiences[0].model_copy(
+        update={"bullets": ("x" * (MAX_BULLET_CHARACTERS + 1),) * 3}
+    )
+    resume = generated_resume.model_copy(update={"experiences": (huge,)})
+
+    with pytest.raises(ResumeValidationError, match="expected between"):
+        validate_resume(resume)
 
 
 def test_a_configured_experience_bullet_count_is_enforced(generated_resume):

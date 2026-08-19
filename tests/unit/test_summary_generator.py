@@ -54,10 +54,29 @@ def test_stray_line_breaks_are_collapsed_rather_than_rejected():
     assert GeneratedSummary(summary=wrapped).summary == SUMMARY
 
 
-def test_an_over_long_summary_is_rejected_so_the_model_rewrites_it():
-    """Rejecting produces a shorter summary; truncating would cut a clause in half."""
-    with pytest.raises(ValidationError, match="at most 300 characters"):
-        GeneratedSummary(summary="x" * (MAX_SUMMARY_CHARACTERS + 1))
+def test_an_over_long_summary_is_kept_rather_than_rejected():
+    """A summary rejected at 308 characters against a limit of 300 ended a run once.
+
+    Length is a layout matter: a long summary takes another line and the renderer
+    tightens. Spending the retry budget on it, and losing everything generated before
+    it, is the trade the house rule forbids.
+    """
+    long_summary = "x" * (MAX_SUMMARY_CHARACTERS + 8)
+
+    assert GeneratedSummary(summary=long_summary).summary == long_summary
+
+
+def test_a_summary_of_several_sentences_is_shortened_cleanly():
+    """Whole sentences go, because cutting at a character count leaves a fragment."""
+    first = "Backend engineer who builds ad serving systems on Kafka and Postgres."
+    filler = " Also writes tooling for internal teams across the company every day."
+    summary = first + filler * 4
+
+    shortened = GeneratedSummary(summary=summary).summary
+
+    assert shortened.startswith(first)
+    assert len(shortened) <= MAX_SUMMARY_CHARACTERS
+    assert shortened.endswith(".")
 
 
 def test_a_summary_at_the_ceiling_is_accepted():

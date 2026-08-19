@@ -18,7 +18,11 @@ from resumelab.llm import base
 from resumelab.llm.prompts import injection_markers
 from resumelab.loaders import load_job_description
 from resumelab.models.job import MAX_JOB_DESCRIPTION_CHARACTERS, MIN_JOB_DESCRIPTION_CHARACTERS
-from resumelab.models.resume import GeneratedSummary
+from resumelab.models.resume import (
+    MAX_BULLET_CHARACTERS,
+    ExperienceBullets,
+    GeneratedSummary,
+)
 from resumelab.utils.errors import describe_validation_error
 from resumelab.utils.paths import ensure_within, prepare_output_file
 from resumelab.utils.text import control_characters, normalize_text, slugify, soften_dashes
@@ -248,33 +252,38 @@ def test_a_single_over_long_word_is_cut_where_it_must_be():
 
 
 def _too_long_error(text: str) -> ValidationError:
-    """A realistic near-miss: the failure mode that was exhausting retry budgets."""
+    """A rejected value long enough that the repair prompt has to quote it back.
+
+    It has to be one sentence: several sentences would be shortened deterministically
+    rather than rejected, which is the whole point of the length rule now. Only the
+    pathology ceiling still rejects, and only a single run-on clause can reach it.
+    """
     try:
-        GeneratedSummary(summary=text)
+        ExperienceBullets(bullets=(text, "b" * 60, "c" * 60))
     except ValidationError as exc:
         return exc
-    raise AssertionError("expected the summary to be rejected")
+    raise AssertionError("expected the bullet to be rejected")
 
 
 def test_a_repair_shows_the_model_the_text_it_wrote():
     """Without this the model rewrites from scratch and misses by the same margin."""
-    overlong = "Storage infrastructure engineer who builds distributed systems. " * 6
+    overlong = "Storage infrastructure engineer who builds distributed systems daily " * 6
 
     prompt = base._validation_repair_prompt(_too_long_error(overlong))
 
     assert overlong[:100] in prompt
-    assert "at most 300 characters" in prompt
+    assert f"at most {MAX_BULLET_CHARACTERS} characters" in prompt
 
 
 def test_a_rejected_value_never_reaches_the_message_a_person_sees():
     """The repair prompt goes to the model; this one goes to logs and the CLI."""
-    secret_ish = "Storage engineer at Northlake reachable on 555-0100. " * 6
+    secret_ish = "Storage engineer at Northlake reachable on 555-0100 any weekday " * 6
 
     reported = describe_validation_error(_too_long_error(secret_ish), "response failed:")
 
     assert secret_ish not in reported
     assert "555-0100" not in reported
-    assert "at most 300 characters" in reported
+    assert f"at most {MAX_BULLET_CHARACTERS} characters" in reported
 
 
 def test_an_enormous_rejected_value_is_truncated():

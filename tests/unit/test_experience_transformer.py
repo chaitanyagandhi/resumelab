@@ -301,3 +301,60 @@ def test_generated_experience_carries_optional_anchors_as_none():
 
     assert entry.location is None
     assert entry.bullets == BULLETS
+
+
+# --- length never ends a run ----------------------------------------------
+
+
+def test_the_bullet_that_ended_a_run_is_now_accepted():
+    """The exact failure: "must be at most 118 characters, got 131", four attempts.
+
+    A bullet twenty-six characters over a line is a layout matter. It wraps, the
+    renderer tightens, and the run finishes. Rejecting it spent the whole retry
+    budget and threw away every stage generated before it.
+    """
+    over_the_line = (
+        "Owned infrastructure end to end, provisioning AWS resources via Terraform "
+        "and routing traffic through Cloudflare and Tailscale"
+    ).ljust(131, "x")
+    assert len(over_the_line) == 131  # the exact length from the failing run
+
+    written = bullets(over_the_line, BULLETS[1], BULLETS[2])
+
+    assert written.bullets[0] == over_the_line
+
+
+@pytest.mark.parametrize("length", [119, 150, 200, MAX_BULLET_CHARACTERS])
+def test_no_single_sentence_bullet_under_the_ceiling_is_rejected(length):
+    """Whatever the model returns short of pathology, the run continues."""
+    # Sliced on a word boundary so normalising whitespace cannot change the length.
+    text = ("Shipped an ad delivery surface for advertisers and publishers " * 8)[:length].strip()
+
+    assert bullets(text, BULLETS[1], BULLETS[2]).bullets[0] == text
+
+
+def test_several_sentences_are_shortened_instead_of_wrapping():
+    """Where it can be done without leaving a fragment, it is."""
+    first = "Built an ad serving surface on Kafka and Postgres for publishers."
+    trailing = " It also exposed an internal dashboard for the operations team here."
+
+    written = bullets(first + trailing * 3, BULLETS[1], BULLETS[2])
+
+    assert written.bullets[0] == first
+    assert not written.bullets[0].endswith(" ")
+
+
+def test_a_bullet_is_never_shortened_below_the_minimum():
+    """Trimming stops rather than leaving a bullet too short to say anything.
+
+    A long second sentence carrying a short first one cannot be dropped: what would
+    remain is under the floor, so the whole bullet is kept and allowed to wrap.
+    """
+    opening = "Built an ad server."
+    rest = " " + "It routes advertiser traffic across regions for publishers daily " * 2
+    bullet_text = (opening + rest).strip()
+    assert len(opening) < MIN_BULLET_CHARACTERS < len(bullet_text)
+
+    written = bullets(bullet_text, BULLETS[1], BULLETS[2])
+
+    assert written.bullets[0] == bullet_text

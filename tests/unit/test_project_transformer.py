@@ -75,9 +75,12 @@ def test_three_bullets_are_accepted():
     assert len(content().bullets) == REQUIRED_PROJECT_BULLET_COUNT
 
 
-def test_an_over_long_subtitle_is_rejected():
-    with pytest.raises(ValidationError, match="at most 45 characters"):
-        content(subtitle="x" * (MAX_SUBTITLE_CHARACTERS + 1))
+def test_an_over_long_subtitle_is_kept_rather_than_rejected():
+    """The heading trim absorbs it by dropping technologies, and a heading that still
+    will not fit wraps. Both cost less than losing the run."""
+    long_subtitle = "x" * (MAX_SUBTITLE_CHARACTERS + 10)
+
+    assert content(subtitle=long_subtitle).subtitle == long_subtitle
 
 
 def test_a_subtitle_too_short_to_say_anything_is_rejected():
