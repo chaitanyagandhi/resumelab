@@ -16,6 +16,7 @@ from resumelab.models.resume import (
     MAX_BULLET_CHARACTERS,
     MIN_BULLET_CHARACTERS,
     REQUIRED_EXPERIENCE_BULLET_COUNT,
+    TARGET_BULLET_CHARACTERS,
     ExperienceBullets,
     GeneratedExperience,
 )
@@ -303,58 +304,53 @@ def test_generated_experience_carries_optional_anchors_as_none():
     assert entry.bullets == BULLETS
 
 
-# --- length never ends a run ----------------------------------------------
+# --- the length bound -----------------------------------------------------
 
 
-def test_the_bullet_that_ended_a_run_is_now_accepted():
-    """The exact failure: "must be at most 118 characters, got 131", four attempts.
+def test_a_bullet_over_the_line_is_sent_back():
+    """The bound is what makes the model comply, which is why it is back.
 
-    A bullet twenty-six characters over a line is a layout matter. It wraps, the
-    renderer tightens, and the run finishes. Rejecting it spent the whole retry
-    budget and threw away every stage generated before it.
+    Removing it was tried. With a cap in force a run came back with a median bullet
+    of 113 and twelve of eighteen fitting a line; with the cap gone the next run came
+    back at 140 with none of them fitting, and rendered at the smallest type the
+    renderer allows. The bound stays; the slack lives between it and the target.
     """
-    over_the_line = (
+    over = (
         "Owned infrastructure end to end, provisioning AWS resources via Terraform "
         "and routing traffic through Cloudflare and Tailscale"
     ).ljust(131, "x")
-    assert len(over_the_line) == 131  # the exact length from the failing run
 
-    written = bullets(over_the_line, BULLETS[1], BULLETS[2])
-
-    assert written.bullets[0] == over_the_line
+    with pytest.raises(ValidationError, match=f"at most {MAX_BULLET_CHARACTERS} characters"):
+        bullets(over, BULLETS[1], BULLETS[2])
 
 
-@pytest.mark.parametrize("length", [119, 150, 200, MAX_BULLET_CHARACTERS])
-def test_no_single_sentence_bullet_under_the_ceiling_is_rejected(length):
-    """Whatever the model returns short of pathology, the run continues."""
-    # Sliced on a word boundary so normalising whitespace cannot change the length.
-    text = ("Shipped an ad delivery surface for advertisers and publishers " * 8)[:length].strip()
+def test_the_target_sits_well_below_the_bound():
+    """A model writes to the stated limit, so the gap is what absorbs an overshoot.
 
-    assert bullets(text, BULLETS[1], BULLETS[2]).bullets[0] == text
+    The run that died was asked for 105 against a limit of 118, thirteen characters
+    of room. Asking for 95 leaves twenty-three.
+    """
+    assert MAX_BULLET_CHARACTERS - TARGET_BULLET_CHARACTERS >= 20
 
 
-def test_several_sentences_are_shortened_instead_of_wrapping():
-    """Where it can be done without leaving a fragment, it is."""
+def test_several_sentences_are_shortened_instead_of_being_sent_back():
+    """The free case: a trailing sentence can go without an API call or a fragment."""
     first = "Built an ad serving surface on Kafka and Postgres for publishers."
     trailing = " It also exposed an internal dashboard for the operations team here."
 
     written = bullets(first + trailing * 3, BULLETS[1], BULLETS[2])
 
     assert written.bullets[0] == first
-    assert not written.bullets[0].endswith(" ")
 
 
 def test_a_bullet_is_never_shortened_below_the_minimum():
     """Trimming stops rather than leaving a bullet too short to say anything.
 
-    A long second sentence carrying a short first one cannot be dropped: what would
-    remain is under the floor, so the whole bullet is kept and allowed to wrap.
+    What remains is over the bound, so it is sent back instead of being mangled.
     """
     opening = "Built an ad server."
     rest = " " + "It routes advertiser traffic across regions for publishers daily " * 2
-    bullet_text = (opening + rest).strip()
-    assert len(opening) < MIN_BULLET_CHARACTERS < len(bullet_text)
+    assert len(opening) < MIN_BULLET_CHARACTERS
 
-    written = bullets(bullet_text, BULLETS[1], BULLETS[2])
-
-    assert written.bullets[0] == bullet_text
+    with pytest.raises(ValidationError, match=f"at most {MAX_BULLET_CHARACTERS} characters"):
+        bullets((opening + rest).strip(), BULLETS[1], BULLETS[2])

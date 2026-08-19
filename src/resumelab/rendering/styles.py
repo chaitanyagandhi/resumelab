@@ -33,8 +33,11 @@ MARGIN_HORIZONTAL = 0.5 * inch
 Measured off the reference resume's section rules, which span exactly that. The extra
 fourteen points over the old six-tenths of an inch is two more characters on every
 line, and a bullet that fits one line instead of two saves far more than that."""
-MARGIN_TOP = 0.5 * inch
-MARGIN_BOTTOM = 0.5 * inch
+MARGIN_TOP = 0.4 * inch
+MARGIN_BOTTOM = 0.4 * inch
+"""Measured off the reference, whose ink starts 34pt from the top and ends 31pt from
+the bottom. Half an inch plus the frame's own padding put ours at 42pt on both edges,
+which is most of a line of vertical room given away on each end."""
 
 FRAME_PADDING = 6.0
 """ReportLab's frame padding, applied inside the page margin on every side.

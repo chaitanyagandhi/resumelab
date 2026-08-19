@@ -23,8 +23,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 from resumelab.exceptions import ConfigurationError
 from resumelab.models.candidate import REQUIRED_PROJECT_BULLET_COUNT
 from resumelab.models.resume import (
+    MAX_BULLET_CHARACTERS,
     MAX_SUMMARY_CHARACTERS,
-    ONE_LINE_BULLET_CHARACTERS,
     REQUIRED_EXPERIENCE_BULLET_COUNT,
     ResumeLimits,
 )
@@ -135,7 +135,7 @@ class Settings(BaseSettings):
         description="Longest professional summary this run will accept.",
     )
     bullet_max_characters: int = Field(
-        default=ONE_LINE_BULLET_CHARACTERS,
+        default=MAX_BULLET_CHARACTERS,
         ge=80,
         le=400,
         description="Length a bullet is condensed toward. Not a rejection bound.",

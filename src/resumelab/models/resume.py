@@ -76,39 +76,33 @@ what this candidate is being presented as, which is the thing under study.
 MIN_BULLET_CHARACTERS = 40
 """Below this a bullet cannot carry implementation, detail, and impact."""
 
-TARGET_BULLET_CHARACTERS = 105
-"""One line, with room to spare, measured rather than estimated.
+TARGET_BULLET_CHARACTERS = 95
+"""What the prompts ask for, well inside a line.
 
 A bullet line is :data:`~resumelab.rendering.styles.CONTENT_WIDTH` less the hanging
 indent, and at body size that holds about 116 characters of ordinary prose. The target
 sits below that rather than at it, because a bullet one word over the line does not
 lose a word, it gains a whole line.
 
-This is the number that decides how the page reads. A run that put fifteen of its
-eighteen bullets between 110 and 130 characters drew eight more lines than the
-reference resume it was measured against, and the renderer paid for them by dropping
-a layout scale.
+It sits far below the cap on purpose. Models write to the stated limit rather than
+the stated target, so the limit is what has to be right; the gap between the two is
+what stops a bullet that overshoots by a few words from costing an API call.
 """
 
-ONE_LINE_BULLET_CHARACTERS = 118
-"""What a bullet line actually holds, and what the layout wants.
+MAX_BULLET_CHARACTERS = 118
+"""What a bullet line holds, and the length a bullet is held to.
 
-Not enforced by rejection. A bullet past this wraps, which costs the page a line and
-nothing else; the renderer tightens, and the condenser shortens if it has to. This is
-the number the prompts describe and the condenser aims at.
-"""
+Removing this bound was a mistake worth recording. The reasoning was that a length is
+a layout constraint and a layout constraint should never cost an API call, which is
+true as far as it goes. What it missed is that the bound is also the only thing that
+makes the model comply: with a cap of 130 in force a run came back with a median
+bullet of 113 and twelve of eighteen fitting a line; with the cap removed the next
+run came back at 140 and none of them fitting, condensed itself, and still rendered
+at the smallest type the renderer allows.
 
-MAX_BULLET_CHARACTERS = 320
-"""The pathology ceiling, and the only length that is ever rejected.
-
-Roughly three lines. A model that returns this much after being asked for one line
-has misread the schema rather than overshot it, which is a content error and worth
-the repair call.
-
-It is deliberately nowhere near :data:`ONE_LINE_BULLET_CHARACTERS`. A cap set at the
-line length ended a run: four attempts spent on a bullet of 131 characters against a
-limit of 118, which is exactly the trade the house rule forbids. Length is a layout
-constraint, and a layout constraint is never worth an API call.
+So the bound stays, and the slack lives between here and
+:data:`TARGET_BULLET_CHARACTERS` instead. Multi-sentence overshoots are shortened
+before this is consulted, which costs nothing and catches the easy cases.
 """
 
 _LIST_MARKER = re.compile("^\\s*(?:[-*\\u2022\\u2013\\u2014]|\\d+[.)])\\s+")
@@ -139,7 +133,7 @@ class ResumeLimits(BaseModel):
     model_config = ConfigDict(frozen=True)
 
     summary_max_characters: int = MAX_SUMMARY_CHARACTERS
-    bullet_max_characters: int = ONE_LINE_BULLET_CHARACTERS
+    bullet_max_characters: int = MAX_BULLET_CHARACTERS
     experience_bullet_count: int = REQUIRED_EXPERIENCE_BULLET_COUNT
     project_bullet_count: int = REQUIRED_PROJECT_BULLET_COUNT
 
@@ -219,9 +213,7 @@ def _normalize_bullet(value: str) -> str:
     # Length is a layout constraint. Shorten it here if that can be done cleanly,
     # otherwise let it wrap: a second line costs the page a line, and a rejection
     # costs an API call and can cost the whole run.
-    collapsed = _drop_trailing_sentences(
-        collapsed, ONE_LINE_BULLET_CHARACTERS, MIN_BULLET_CHARACTERS
-    )
+    collapsed = _drop_trailing_sentences(collapsed, MAX_BULLET_CHARACTERS, MIN_BULLET_CHARACTERS)
     if len(collapsed) > MAX_BULLET_CHARACTERS:
         raise ValueError(
             f"must be at most {MAX_BULLET_CHARACTERS} characters, got {len(collapsed)}"

@@ -354,10 +354,12 @@ should. A frontend, the infrastructure under it, and the edge cache in front of 
 belong in one sentence, because that is how a stack is actually described. What does \
 not work is a list: each technology has to be doing a job in the sentence, connected \
 to the others by what the system does.
-- Keep each bullet to a single line. Aim at about 105 characters; 118 is the hard \
-limit. A line holds roughly 116, so a bullet that runs a couple of words long does \
-not lose the words, it gains a whole second line carrying three of them. This is the \
-whole shape of the page: wrapped bullets crowd the resume until the type shrinks.
+- Keep each bullet to a single line. Aim at about 95 characters and never exceed \
+118, which is what a line holds. This is the constraint that decides how the whole \
+page reads, so when a bullet will not fit, cut something out of it rather than \
+letting it run: drop the least important technology, or a qualifier, never the \
+number. A bullet that runs two words long does not lose two words, it gains a second \
+line carrying three.
 - Do not carry a name, a title, or a proper noun out of the source material that \
 announces the old domain. A paper called "SMS Spam Detection Using Deep Learning \
 Techniques" quoted verbatim, with a clause about this employer's field bolted on, \
@@ -423,10 +425,12 @@ Also:
 BULLETS ALREADY WRITTEN ELSEWHERE ON THIS RESUME.
 - Quantify. Invent concrete figures at the scale this employer's own systems run at, \
 not the scale a side project would.
-- Keep each bullet to a single line. Aim at about 105 characters; 118 is the hard \
-limit. A line holds roughly 116, so a bullet that runs a couple of words long does \
-not lose the words, it gains a whole second line carrying three of them. This is the \
-whole shape of the page: wrapped bullets crowd the resume until the type shrinks.
+- Keep each bullet to a single line. Aim at about 95 characters and never exceed \
+118, which is what a line holds. This is the constraint that decides how the whole \
+page reads, so when a bullet will not fit, cut something out of it rather than \
+letting it run: drop the least important technology, or a qualifier, never the \
+number. A bullet that runs two words long does not lose two words, it gains a second \
+line carrying three.
 - The source project supplies its name and its rough shape. Nothing else about it is \
 binding. What survives the move is that one person at this level built a system of \
 about this size; the domain it served, the stack it ran on, and what it was for are \
