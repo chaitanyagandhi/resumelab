@@ -27,7 +27,12 @@ from reportlab.platypus import TableStyle
 PAGE_SIZE = LETTER
 """US Letter, the expected format for the audience this resume targets."""
 
-MARGIN_HORIZONTAL = 0.6 * inch
+MARGIN_HORIZONTAL = 0.5 * inch
+"""Half an inch, which puts :data:`CONTENT_WIDTH` at 528pt.
+
+Measured off the reference resume's section rules, which span exactly that. The extra
+fourteen points over the old six-tenths of an inch is two more characters on every
+line, and a bullet that fits one line instead of two saves far more than that."""
 MARGIN_TOP = 0.5 * inch
 MARGIN_BOTTOM = 0.5 * inch
 
@@ -96,7 +101,7 @@ def register_fonts() -> None:
 
 BODY_FONT_SIZE = 10.0
 NAME_FONT_SIZE = 18.0
-CONTACT_FONT_SIZE = 9.0
+CONTACT_FONT_SIZE = 9.5
 SECTION_FONT_SIZE = 11.0
 ENTRY_FONT_SIZE = 10.0
 DATE_FONT_SIZE = 9.0
@@ -147,7 +152,12 @@ INK = HexColor("#111111")
 """Near-black rather than pure black; easier to read and prints identically."""
 
 MUTED_INK = HexColor("#444444")
-LINK_INK = HexColor("#1F4E79")
+LINK_INK = INK
+"""Links are drawn in the body colour, as the reference does.
+
+They stay clickable: the annotation is what makes a link, not the colour. Blue link
+text on a resume reads as a web page, and the addresses are short enough to be typed
+out by anyone reading it on paper."""
 RULE_INK = HexColor("#999999")
 
 # --- spacing ----------------------------------------------------------------

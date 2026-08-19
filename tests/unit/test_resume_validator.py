@@ -153,7 +153,7 @@ def test_an_unreasonable_bullet_length_is_rejected(generated_resume, length):
     experience = generated_resume.experiences[0]
     broken = experience.model_copy(update={"bullets": ("x" * length, *experience.bullets[1:])})
 
-    assert "expected between 40 and 130" in failures(
+    assert f"expected between 40 and {MAX_BULLET_CHARACTERS}" in failures(
         replace(generated_resume, experiences=(broken,))
     )
 

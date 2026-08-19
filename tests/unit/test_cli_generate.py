@@ -31,7 +31,7 @@ SUMMARY = (
 )
 BULLETS = (
     "Built a replication controller in Go placing volumes across 3,000 nodes, "
-    "cutting rebalance time to ten minutes.",
+    "cutting rebalance to ten minutes.",
     "Instrumented the NVMe write path with per-device histograms, surfacing tail "
     "regressions before release.",
     "Designed an erasure-coded storage tier on Linux, cutting capacity overhead "

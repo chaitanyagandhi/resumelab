@@ -80,7 +80,7 @@ def test_whitespace_is_collapsed():
 
 
 def test_an_over_long_bullet_is_rejected_so_the_model_rewrites_it():
-    with pytest.raises(ValidationError, match="at most 130 characters"):
+    with pytest.raises(ValidationError, match=f"at most {MAX_BULLET_CHARACTERS} characters"):
         bullets("x" * (MAX_BULLET_CHARACTERS + 1), BULLETS[1], BULLETS[2])
 
 

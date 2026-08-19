@@ -9,7 +9,11 @@ import pytest
 
 from resumelab.exceptions import LLMGenerationError
 from resumelab.llm.prompts import CONDENSE_PROMPT
-from resumelab.models.resume import CondensedContent, ResumeLimits
+from resumelab.models.resume import (
+    MAX_BULLET_CHARACTERS,
+    CondensedContent,
+    ResumeLimits,
+)
 from resumelab.pipeline import condense_resume
 
 SHORT_SUMMARY = "Storage infrastructure engineer building distributed data-path services in Go."
@@ -104,7 +108,7 @@ def test_the_budget_is_stated(generated_resume, client):
     user_prompt = client.last_call.user_prompt
     assert f"Return exactly {len(generated_resume.all_bullets)} bullets." in user_prompt
     assert "at most 300 characters" in user_prompt
-    assert "at most 130 characters" in user_prompt
+    assert f"at most {MAX_BULLET_CHARACTERS} characters" in user_prompt
 
 
 def test_a_tighter_budget_is_passed_through(generated_resume, client):

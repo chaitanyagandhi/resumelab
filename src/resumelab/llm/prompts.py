@@ -346,9 +346,10 @@ should. A frontend, the infrastructure under it, and the edge cache in front of 
 belong in one sentence, because that is how a stack is actually described. What does \
 not work is a list: each technology has to be doing a job in the sentence, connected \
 to the others by what the system does.
-- Keep each bullet to a single line. A line is about 110 characters; 130 is the \
-hard limit. This is the whole shape of the page: two-line bullets crowd the resume \
-until the type has to shrink to fit.
+- Keep each bullet to a single line. Aim at about 105 characters; 118 is the hard \
+limit. A line holds roughly 116, so a bullet that runs a couple of words long does \
+not lose the words, it gains a whole second line carrying three of them. This is the \
+whole shape of the page: wrapped bullets crowd the resume until the type shrinks.
 - Scale the numbers to this employer's world, not the source material's. The figures \
 are generated either way, and one sized for a class assignment describes a candidate \
 this employer is not hiring. Traffic, data volume, and user counts should be what \
@@ -409,9 +410,10 @@ Also:
 BULLETS ALREADY WRITTEN ELSEWHERE ON THIS RESUME.
 - Quantify. Invent concrete figures at the scale this employer's own systems run at, \
 not the scale a side project would.
-- Keep each bullet to a single line. A line is about 110 characters; 130 is the \
-hard limit. This is the whole shape of the page: two-line bullets crowd the resume \
-until the type has to shrink to fit.
+- Keep each bullet to a single line. Aim at about 105 characters; 118 is the hard \
+limit. A line holds roughly 116, so a bullet that runs a couple of words long does \
+not lose the words, it gains a whole second line carrying three of them. This is the \
+whole shape of the page: wrapped bullets crowd the resume until the type shrinks.
 - The source project supplies its name and its rough shape. Nothing else about it is \
 binding. What survives the move is that one person at this level built a system of \
 about this size; the domain it served, the stack it ran on, and what it was for are \
