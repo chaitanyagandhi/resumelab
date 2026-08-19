@@ -5,10 +5,12 @@ import re
 import pytest
 
 from resumelab.llm.prompts import (
+    EXPERIENCE_PROMPT,
     FENCE_MARKER,
     JD_ANALYSIS_PROMPT_VERSION,
     PROMPT_VERSIONS,
     RESEARCH_SYSTEM_PREAMBLE,
+    SUMMARY_PROMPT,
     TRANSFORMATION_PROMPT_VERSION,
     Prompt,
     Section,
@@ -203,3 +205,36 @@ def test_trusted_sections_are_not_neutralized():
     rendered = PROMPT.user(Section(label="ANALYSIS", content=content))
 
     assert content in rendered
+
+
+# --- hedging --------------------------------------------------------------
+
+
+def test_the_preamble_forbids_holding_a_claim_at_arms_length():
+    """Two runs produced "ClickHouse-adjacent data pipeline experience" and
+    "high-traffic, ad-adjacent platforms". Both name the thing and then withdraw it,
+    which matches no search and reads as a candidate who does not have it.
+    """
+    assert "ad-adjacent" in RESEARCH_SYSTEM_PREAMBLE
+    assert "never soften a claim by attaching a word" in RESEARCH_SYSTEM_PREAMBLE
+
+
+def test_the_ban_reaches_every_transformation_stage():
+    """It sits in the shared preamble, so no stage can be tailored past it."""
+    for prompt in (EXPERIENCE_PROMPT, SUMMARY_PROMPT):
+        assert "never soften a claim by attaching a word" in prompt.system
+
+
+# --- keeping the old domain out -------------------------------------------
+
+
+def test_the_experience_prompt_refuses_to_quote_a_source_artifact():
+    """A paper title carried across verbatim states the original subject and then
+    contradicts it with a clause about the employer's field."""
+    assert "announces the old domain" in EXPERIENCE_PROMPT.instructions
+
+
+def test_the_summary_prompt_bounds_how_many_technologies_it_names():
+    """A summary reciting ten nouns is a list with a full stop on it; the skills
+    section is where the full stack goes."""
+    assert "Three or four, not ten" in SUMMARY_PROMPT.instructions

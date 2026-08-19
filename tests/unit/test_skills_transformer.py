@@ -209,7 +209,8 @@ def test_the_prompt_states_the_selection_rule(
     # The strategy's ordered list is the source, so the section cannot quietly fall
     # back to the profile while the posting still has terms left to give.
     assert "skills_priority already lists these in order" in system_prompt
-    assert "Name every part of a named stack separately" in system_prompt
+    assert "Expand every stack the posting writes as a bundle" in system_prompt
+    assert "Expanding a bundle takes priority over adding a phrase" in system_prompt
     assert "raw material, not a checklist" in system_prompt
     # Reversed deliberately: the section is read by keyword matching before a person
     # sees it, and a near-synonym does not match.
@@ -223,7 +224,11 @@ def test_the_prompt_admits_entries_that_are_not_technologies(
     """A phrase the posting leans on counts as a skill for this section's purposes."""
     system_prompt = client.last_call.system_prompt if client.calls else SKILLS_PROMPT.system
 
-    assert "Entries do not have to be technologies" in system_prompt
+    assert "entries do not have to be technologies" in system_prompt
+    # But only after the named technologies are in. A run spent four slots on
+    # "High Agency" and "End to End Ownership" while the whole LGTM stack was
+    # missing, which trades four searchable terms for four that are not.
+    assert "Named technologies come first and they are never displaced" in system_prompt
     assert "Omit proficiency ratings and years of experience" in system_prompt
 
 

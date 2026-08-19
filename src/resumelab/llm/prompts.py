@@ -25,7 +25,7 @@ from typing import Final
 JD_ANALYSIS_PROMPT_VERSION: Final = "1.0"
 """Version of the job description analysis prompt."""
 
-TRANSFORMATION_PROMPT_VERSION: Final = "1.8"
+TRANSFORMATION_PROMPT_VERSION: Final = "1.9"
 """Version of the transformation prompt suite: strategy, summary, experience,
 projects, and skills. These are tuned as one set and move together."""
 
@@ -66,7 +66,12 @@ study, not a failure mode.
 and architectural concepts from the job description, generate concrete quantified \
 impact, and reposition what a project was fundamentally about.
 - Do not hedge, add disclaimers, refuse to alter technical details, or note that a \
-claim may be unsupported. Another part of the system measures the difference between \
+claim may be unsupported. In particular, never soften a claim by attaching a word \
+that holds it at arm's length: "ad-adjacent", "ClickHouse-adjacent", "exposure to \
+Kubernetes", "React-style", "Rails-like". Either the resume says the thing or it does \
+not; a hedge matches no search and reads as a candidate who does not have it.
+
+Another part of the system measures the difference between \
 the source profile and your output; your job is to produce the transformed resume.
 
 How to answer:
@@ -281,9 +286,12 @@ posting names the role it is hiring for. If the posting is for a Backend Enginee
 the summary opens "Backend Engineer"; a reader should finish the first two words \
 already looking at their own job title.
 
-After that, name the concrete technologies and problem domains that define the \
-identity, in the posting's own words: the specific ones this employer cares about, \
-not a category label.
+After that, name what this engineer builds and the three or four technologies that \
+define it, in the posting's own words. Three or four, not ten: the skills section \
+carries the full list, and a summary that recites a stack is a list with a full stop \
+on it. "building ad-serving platforms and advertiser-facing UIs with React, \
+TypeScript, and Ruby on Rails" says more than the same ten nouns in a row, because it \
+says what was built.
 
 Never write any of these, or anything like them:
 - "Passionate software engineer seeking opportunities to..."
@@ -350,6 +358,11 @@ to the others by what the system does.
 limit. A line holds roughly 116, so a bullet that runs a couple of words long does \
 not lose the words, it gains a whole second line carrying three of them. This is the \
 whole shape of the page: wrapped bullets crowd the resume until the type shrinks.
+- Do not carry a name, a title, or a proper noun out of the source material that \
+announces the old domain. A paper called "SMS Spam Detection Using Deep Learning \
+Techniques" quoted verbatim, with a clause about this employer's field bolted on, \
+relocates nothing: it states the original subject and then contradicts it. Describe \
+what the work would have been here, and let the artifact take that name too.
 - Scale the numbers to this employer's world, not the source material's. The figures \
 are generated either way, and one sized for a class assignment describes a candidate \
 this employer is not hiring. Traffic, data volume, and user counts should be what \
@@ -451,9 +464,11 @@ the difference with skills a person doing this job would be expected to have: th
 same stack, the same layer of the system, the adjacent tool. The candidate's existing \
 profile is one source for these, and it ranks below anything the posting asked for.
 
-Name every part of a named stack separately. A posting listing "LGTM (Loki, Grafana, \
-Tempo, Mimir)" is naming five things a reader may search for, and one entry saying \
-"LGTM" matches one of them.
+Expand every stack the posting writes as a bundle. "LGTM (Loki, Grafana, Tempo, \
+Mimir)" is five entries, not one: a filter searching for Grafana does not match \
+"LGTM", and the posting spelled the parts out because it expects to see them. The \
+same goes for any grouping written with a slash or parentheses. Expanding a bundle \
+takes priority over adding a phrase.
 
 The profile's skill list is raw material, not a checklist. A skill that is in the \
 profile but neither named by the posting nor adjacent to it does not go in, however \
@@ -465,9 +480,15 @@ by keyword matching before a person ever sees it, and a near-synonym does not ma
 If the posting says "Server Side Development", write "Server Side Development", not \
 "Backend Engineering".
 
-Entries do not have to be technologies. A phrase the posting uses to describe the \
-work, a named product or platform of the employer's, and a requirement written as a \
-capability all belong here if the posting leans on them: "Distributed Systems", \
+Named technologies come first and they are never displaced. Every language, \
+framework, database, and piece of infrastructure the posting names goes in before any \
+phrase does. A list that spends slots on "High Agency" and "End to End Ownership" \
+while Grafana, Loki, Tempo and Mimir are missing has traded four things a filter \
+searches for against four things it does not.
+
+Once those are in, and only then, entries do not have to be technologies. A phrase \
+the posting uses to describe the work, a named product or platform of the employer's, \
+and a requirement written as a capability all belong here if room is left: "Distributed Systems", \
 "Workflow Scheduling", "Computer Science Fundamentals", the employer's own product \
 name. If the posting treats it as something the candidate should bring, it is a skill \
 for the purposes of this section.
