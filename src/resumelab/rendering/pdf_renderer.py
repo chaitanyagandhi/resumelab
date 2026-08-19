@@ -43,6 +43,24 @@ from resumelab.rendering.options import DEFAULT_RENDER_OPTIONS, RenderOptions, R
 
 logger = logging.getLogger(__name__)
 
+DEGREE_ABBREVIATIONS = {
+    "bachelor of arts": "BA",
+    "bachelor of engineering": "BE",
+    "bachelor of science": "BS",
+    "bachelor of technology": "BTech",
+    "master of arts": "MA",
+    "master of business administration": "MBA",
+    "master of engineering": "MEng",
+    "master of science": "MS",
+    "doctor of philosophy": "PhD",
+}
+"""How a degree is written on a resume, keyed by how it is written on a transcript.
+
+Display only, and matched on the whole field rather than by pattern: a partial match
+would turn an unfamiliar degree into a plausible-looking wrong one, and the profile
+is the record of what was actually awarded.
+"""
+
 
 @dataclass(frozen=True, slots=True)
 class RenderResult:
@@ -166,10 +184,14 @@ def _build_story(
 ) -> Iterable[Flowable]:
     """Produce the flowables for the whole document, in reading order.
 
-    The header opens the document and the achievements close it, with the summary
-    directly beneath the name where it is read or skipped in one glance. Between them
-    the four body sections are drawn in whatever order was asked for; the dispatch is
-    a lookup rather than a branch so that no order is a special case.
+    The header opens the document, with the summary directly beneath the name where
+    it is read or skipped in one glance. Below it the four body sections are drawn in
+    whatever order was asked for; the dispatch is a lookup rather than a branch so
+    that no order is a special case.
+
+    Achievements are not drawn. The profile still records them and a run still keeps
+    them, but a one-page resume spends a heading, a rule, and a line on what is
+    almost always a restatement of something already above it.
     """
     yield from _header(resume.personal, stylesheet)
     if options.include_summary:
@@ -178,12 +200,6 @@ def _build_story(
         )
     for section in options.section_order:
         yield from _SECTION_BUILDERS[section](resume, stylesheet, options)
-    if resume.achievements:
-        yield from _section(
-            "Achievements",
-            [_bullet(text, stylesheet) for text in resume.achievements],
-            stylesheet,
-        )
 
 
 def _education_section(
@@ -265,24 +281,56 @@ def _education(
     *,
     include_gpa: bool,
 ) -> Iterable[Flowable]:
+    """Three lines per degree: the qualification, where it came from, what it covered.
+
+    The degree leads. It is what a reader is scanning this section *for*, and the
+    institution qualifies it rather than the other way round; leading with the
+    university buries the one fact the section exists to state.
+    """
     for entry in entries:
         yield _flush_right_row(
-            _joined(_bold(entry.institution), entry.location),
+            _bold(_qualification(entry)),
             _date_text(entry.start_date, entry.end_date),
             stylesheet,
         )
-        qualification = " ".join(part for part in (entry.degree, entry.field) if part)
-        # Withheld and absent are the same thing on the page: the qualification line
-        # is set without a right-hand column rather than with an empty one.
+        # Withheld and absent are the same thing on the page: the line is set without
+        # a right-hand column rather than with an empty one.
         gpa = f"GPA: {entry.gpa}" if include_gpa and entry.gpa else ""
-        if qualification or gpa:
+        institution = _institution(entry)
+        if institution or gpa:
             yield _flush_right_row(
-                _text(qualification),
+                institution,
                 gpa,
                 stylesheet,
                 leading_style="detail",
                 trailing_style="detail_right",
             )
+        if entry.coursework:
+            yield Paragraph(
+                _text(f"Coursework: {', '.join(entry.coursework)}"), stylesheet["detail"]
+            )
+
+
+def _qualification(entry: Education) -> str:
+    """The degree as a reader scans for it: ``MS Computer Science``.
+
+    Abbreviated because the long form is three words of boilerplate in front of the
+    one word that carries meaning, and because the heading has to share its line with
+    a date range. A degree with no known abbreviation is left as written rather than
+    shortened by guesswork.
+    """
+    degree = DEGREE_ABBREVIATIONS.get(entry.degree.strip().lower(), entry.degree)
+    return " ".join(part for part in (degree, entry.field) if part)
+
+
+def _institution(entry: Education) -> str:
+    """Where the degree came from, set in italics with the separator outside them.
+
+    A separator inside an italic run is leaned along with the text around it, which
+    for a drawn glyph means it is sheared rather than styled.
+    """
+    parts = [f"<i>{_text(part)}</i>" for part in (entry.institution, entry.location) if part]
+    return styles.SEPARATOR.join(parts)
 
 
 def _experiences(
@@ -354,18 +402,6 @@ def _section(
 
 def _bullet(text: str, stylesheet: dict[str, ParagraphStyle]) -> Paragraph:
     return Paragraph(_text(text), stylesheet["bullet"], bulletText=styles.BULLET_CHARACTER)
-
-
-def _joined(*parts: str | None) -> str:
-    """Join present fields with the separator, escaping any that are raw text."""
-    return styles.SEPARATOR.join(
-        part if _is_markup(part) else _text(part) for part in parts if part
-    )
-
-
-def _is_markup(part: str) -> bool:
-    """Whether ``part`` has already been escaped and wrapped in tags."""
-    return part.startswith("<")
 
 
 def _date_text(start: str | None, end: str | None) -> str:

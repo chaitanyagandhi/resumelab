@@ -287,7 +287,9 @@ def profile_data():
         "education": [
             {
                 "institution": "University of Southern California",
-                "degree": "M.S.",
+                # Written out, the way a transcript writes it and the way the real
+                # profile does, so the renderer's abbreviation is actually exercised.
+                "degree": "Master of Science",
                 "field": "Computer Science",
                 "location": "Los Angeles, CA",
                 "start_date": "Aug 2024",

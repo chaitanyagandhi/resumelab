@@ -277,16 +277,80 @@ def test_no_control_characters_survive_anywhere_in_the_document(extracted):
     ]
 
 
-def test_achievements_are_rendered_when_present(extracted, generated_resume):
-    assert generated_resume.achievements[0] in extracted
+def test_achievements_are_not_drawn_even_when_the_profile_has_them(extracted, generated_resume):
+    """The run still records them; the page spends its room on something else.
+
+    A heading, a rule, and a line for what is almost always a restatement of
+    something already above it is the worst trade on a one-page resume.
+    """
+    assert generated_resume.achievements
+    assert "ACHIEVEMENTS" not in extracted
+    assert generated_resume.achievements[0] not in extracted
 
 
-def test_the_achievements_section_is_omitted_when_there_are_none(tmp_path, generated_resume):
-    bare = generated_resume.model_copy(update={"achievements": ()})
+def test_the_recorded_resume_still_carries_its_achievements(generated_resume):
+    """Not drawing them is a layout decision, not a deletion from the record."""
+    assert generated_resume.achievements == ("Dean's List",)
 
-    text = _text_of(render_resume(bare, tmp_path / "bare.pdf").path)
 
-    assert "ACHIEVEMENTS" not in text
+# --- education ------------------------------------------------------------
+
+
+def test_the_degree_leads_the_entry(extracted, generated_resume):
+    """What a reader scans this section for; the institution qualifies it."""
+    entry = generated_resume.education[0]
+
+    assert "MS Computer Science" in extracted
+    assert extracted.index("MS Computer Science") < extracted.index(entry.institution)
+
+
+def test_a_degree_with_no_known_abbreviation_is_left_as_written(tmp_path, generated_resume):
+    """Guessing at an unfamiliar degree would invent a qualification nobody holds."""
+    odd = generated_resume.education[0].model_copy(update={"degree": "Licenciatura en Informatica"})
+    resume = generated_resume.model_copy(update={"education": (odd,)})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "odd.pdf").path))
+
+    assert "Licenciatura en Informatica" in text
+
+
+def test_the_abbreviation_ignores_how_the_degree_was_capitalised(tmp_path, generated_resume):
+    shouted = generated_resume.education[0].model_copy(update={"degree": "MASTER OF SCIENCE"})
+    resume = generated_resume.model_copy(update={"education": (shouted,)})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "shouted.pdf").path))
+
+    assert "MS Computer Science" in text
+
+
+def test_coursework_is_rendered(extracted, generated_resume):
+    """It is in the profile and was being dropped on the floor."""
+    entry = generated_resume.education[0]
+
+    assert f"Coursework: {', '.join(entry.coursework)}" in extracted
+
+
+def test_an_entry_with_only_a_degree_skips_the_line_beneath_it(tmp_path, generated_resume):
+    """No institution, no location, no GPA leaves nothing to set, so nothing is."""
+    sparse = generated_resume.education[0].model_copy(
+        update={"institution": "", "location": None, "gpa": None, "coursework": ()}
+    )
+    resume = generated_resume.model_copy(update={"education": (sparse,)})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "sparse.pdf").path))
+
+    assert "MS Computer Science" in text
+    assert "GPA" not in text
+
+
+def test_an_entry_without_coursework_skips_the_line(tmp_path, generated_resume):
+    bare = generated_resume.education[0].model_copy(update={"coursework": ()})
+    resume = generated_resume.model_copy(update={"education": (bare,)})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "no_course.pdf").path))
+
+    assert "Coursework" not in text
+    assert bare.institution in text
 
 
 def test_content_appears_in_reading_order(extracted, generated_resume):
