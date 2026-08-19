@@ -24,7 +24,7 @@ from resumelab.models.resume import (
 from resumelab.pipeline import transform_projects
 
 SUBTITLE = "NVMe-oF Event Processing Engine"
-TECHNOLOGIES = ("Go", "Linux", "NVMe-oF")
+TECHNOLOGIES = ("Go", "NVMe-oF")
 BULLETS = (
     "Designed a shared-nothing ingestion path fanning writes across NVMe-oF "
     "targets at 40k events per second.",
@@ -89,15 +89,16 @@ def test_subtitle_whitespace_is_collapsed():
     assert content(subtitle=f"  {SUBTITLE}\n ").subtitle == SUBTITLE
 
 
-def test_a_project_needs_more_than_one_technology():
-    with pytest.raises(ValidationError, match="at least 2 technologies"):
-        content(technologies=("Go",))
+def test_a_project_needs_at_least_one_technology():
+    """One is the floor the heading trim degrades to; none says nothing at all."""
+    with pytest.raises(ValidationError, match="at least 1 technolog"):
+        content(technologies=())
 
 
 def test_an_overstuffed_technology_list_is_rejected():
     too_many = tuple(f"Tech{index}" for index in range(MAX_PROJECT_TECHNOLOGIES + 1))
 
-    with pytest.raises(ValidationError, match="at most 5 technologies"):
+    with pytest.raises(ValidationError, match="at most 2 technologies"):
         content(technologies=too_many)
 
 
@@ -105,10 +106,9 @@ def test_duplicate_technologies_are_cleaned_rather_than_rejected():
     assert content(technologies=("Go", "go", "  Linux  ")).technologies == ("Go", "Linux")
 
 
-def test_deduplication_can_push_a_list_below_the_floor():
+def test_deduplication_can_push_a_list_below_the_cap():
     """Two entries that are the same technology are one technology."""
-    with pytest.raises(ValidationError, match="at least 2 technologies"):
-        content(technologies=("Go", "GO", "go"))
+    assert content(technologies=("Go", "GO", "go")).technologies == ("Go",)
 
 
 def test_repeated_bullets_are_rejected():
@@ -312,20 +312,19 @@ def test_an_overlong_heading_is_trimmed_rather_than_rejected():
     something else, and the retry budget goes. Trimming is deterministic and free.
     """
     fitted = content(
-        subtitle="Enterprise Secrets Integration Platform",
-        technologies=("TypeScript", "Node.js", "PostgreSQL", "Redis", "Kubernetes"),
+        subtitle="x" * MAX_SUBTITLE_CHARACTERS,
+        technologies=("TypeScript", "PostgreSQL Logical Replication"),
     )
 
     assert len(fitted.subtitle) + len(", ".join(fitted.technologies)) <= (
         MAX_PROJECT_HEADING_CHARACTERS
     )
     # Trimmed from the end: the technologies are in priority order.
-    assert fitted.technologies[0] == "TypeScript"
-    assert len(fitted.technologies) < 5
+    assert fitted.technologies == ("TypeScript",)
 
 
 def test_a_heading_within_budget_is_left_exactly_as_written():
-    stack = ("Go", "Linux", "NVMe-oF")
+    stack = ("Go", "NVMe-oF")
 
     assert content(subtitle="NVMe-oF Event Engine", technologies=stack).technologies == stack
 
@@ -334,7 +333,7 @@ def test_trimming_never_goes_below_the_minimum_stack():
     """A heading that still will not fit wraps. That costs one line, not the run."""
     fitted = content(
         subtitle="x" * MAX_SUBTITLE_CHARACTERS,
-        technologies=("PostgreSQL", "Kubernetes", "OpenTelemetry"),
+        technologies=("P" * 40, "O" * 40),
     )
 
     assert len(fitted.technologies) == MIN_PROJECT_TECHNOLOGIES
@@ -348,10 +347,10 @@ def test_trimming_is_not_silently_skipped(recwarn):
     the SDKs build it must both apply the trim and raise no warning.
     """
     fitted = ProjectContent(
-        subtitle="Enterprise Secrets Integration Platform",
-        technologies=("TypeScript", "Node.js", "PostgreSQL", "Kubernetes", "OpenTelemetry"),
+        subtitle="x" * MAX_SUBTITLE_CHARACTERS,
+        technologies=("TypeScript", "PostgreSQL Logical Replication"),
         bullets=BULLETS,
     )
 
-    assert len(fitted.technologies) < 5
+    assert len(fitted.technologies) < 2
     assert [str(w.message) for w in recwarn.list] == []

@@ -257,18 +257,19 @@ recognizable signature of machine-written text, and a document whose whole purpo
 to read as though a person wrote it cannot afford one.
 """
 
-PROJECT_STACK_SEPARATOR = " / "
+PROJECT_STACK_SEPARATOR = " | "
 """Divides a project's subtitle from the stack sharing its line.
 
-Deliberately not :data:`SEPARATOR`. That line already carries an em dash between the
-name and the subtitle, and a third dot after it would read as one more field in the
-same run rather than a shift to the technologies.
+Deliberately not :data:`SEPARATOR`. That line already carries a hyphen between the
+name and the subtitle, and a dot after it would read as one more field in the same
+run rather than a shift to the technologies.
 
-A slash rather than a pipe: it leans the way the italic stack beside it does, where a
-pipe stands upright against it even when italicised. Drawn upright rather than inside
-the italic run, because a slash already carries its own angle and the oblique font
-would add a second one. Plain ASCII, so it extracts as ``/`` everywhere and the shape
-costs a parser nothing.
+A pipe rather than a slash. This reverses an earlier decision that preferred the
+slash for leaning with the italic stack it introduces; an upright bar is what the
+reference format uses, and against a line that already slopes it reads as a divider
+rather than as punctuation belonging to either side. Drawn outside the italic run,
+which is what keeps it upright. Plain ASCII either way, so it extracts as ``|``
+everywhere and the shape costs a parser nothing.
 """
 
 

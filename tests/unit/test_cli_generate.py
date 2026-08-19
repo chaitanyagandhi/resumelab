@@ -44,7 +44,7 @@ runner = CliRunner()
 def project_content(index: int) -> ProjectContent:
     return ProjectContent(
         subtitle=f"NVMe-oF Backed Storage Engine {index}",
-        technologies=("Go", "Linux", "NVMe-oF"),
+        technologies=("Go", "NVMe-oF"),
         bullets=tuple(f"{bullet} Variant {index}." for bullet in BULLETS),
     )
 

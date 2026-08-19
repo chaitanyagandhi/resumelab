@@ -47,10 +47,16 @@ at the longest project name in a full profile, not estimated from character coun
 Enforced by trimming, never by rejection — see :meth:`ProjectContent._fit_heading`.
 """
 
-MIN_PROJECT_TECHNOLOGIES = 2
-"""A project presented as using one technology reads as unfinished."""
+MIN_PROJECT_TECHNOLOGIES = 1
+"""The floor the heading trim is allowed to degrade to.
 
-MAX_PROJECT_TECHNOLOGIES = 5
+Not the target. Two is what the prompt asks for and what a project normally names;
+this is how far :meth:`ProjectContent._fit_heading` may drop when a long subtitle
+would otherwise wrap the line. A single technology reads thin, and a wrapped heading
+costs a line, so the trim spends the first before the second.
+"""
+
+MAX_PROJECT_TECHNOLOGIES = 2
 """Beyond this the list stops being read and starts looking padded.
 
 It also has to share the title line with the project name and subtitle, so the cap is

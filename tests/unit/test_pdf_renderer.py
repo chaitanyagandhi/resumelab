@@ -14,7 +14,11 @@ from reportlab.lib.enums import TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
 
 from resumelab.exceptions import PDFRenderingError, ResumeLabError
-from resumelab.models.resume import MAX_BULLET_CHARACTERS, TARGET_BULLET_CHARACTERS
+from resumelab.models.resume import (
+    MAX_BULLET_CHARACTERS,
+    MAX_PROJECT_TECHNOLOGIES,
+    TARGET_BULLET_CHARACTERS,
+)
 from resumelab.rendering import RenderOptions, ResumeSection, pdf_renderer, render_resume, styles
 from resumelab.rendering.styles import (
     LAYOUT_SCALES,
@@ -916,9 +920,25 @@ def test_project_technologies_sit_on_the_title_line(extracted, generated_resume)
 
 
 def test_the_project_stack_uses_its_own_separator(extracted, generated_resume):
-    """A third dot on that line would read as one more field, not a shift to the stack."""
+    """A dot on that line would read as one more field, not a shift to the stack."""
     assert styles.PROJECT_STACK_SEPARATOR != styles.SEPARATOR
     assert styles.PROJECT_STACK_SEPARATOR.strip() in extracted
+
+
+def test_the_stack_separator_is_plain_ascii(extracted):
+    """It survives extraction as itself, which a drawn glyph would not.
+
+    The document's own middle dot needs an embedded font to extract correctly; this
+    one is a bar, so it costs a parser nothing and needs no font of its own.
+    """
+    assert styles.PROJECT_STACK_SEPARATOR.strip() == "|"
+    assert "|" in extracted
+
+
+def test_a_project_names_no_more_technologies_than_the_heading_can_hold(generated_resume):
+    """Two is the whole budget: the stack shares its line with a name and a subtitle."""
+    for project in generated_resume.projects:
+        assert len(project.technologies) <= MAX_PROJECT_TECHNOLOGIES
 
 
 def test_projects_are_drawn_in_the_order_they_are_given(tmp_path, generated_resume):

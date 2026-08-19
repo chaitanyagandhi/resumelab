@@ -145,7 +145,7 @@ def generated_resume(candidate_profile):
                 name=f"Project {index}",
                 subtitle=f"Distributed Storage Engine {index}",
                 date="2025",
-                technologies=("Go", "Linux", "NVMe-oF"),
+                technologies=("Go", "NVMe-oF"),
                 bullets=tuple(f"{bullet} Variant {index}." for bullet in PROJECT_BULLETS),
             )
             for index in range(1, 4)

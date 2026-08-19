@@ -25,7 +25,7 @@ from typing import Final
 JD_ANALYSIS_PROMPT_VERSION: Final = "1.0"
 """Version of the job description analysis prompt."""
 
-TRANSFORMATION_PROMPT_VERSION: Final = "1.4"
+TRANSFORMATION_PROMPT_VERSION: Final = "1.5"
 """Version of the transformation prompt suite: strategy, summary, experience,
 projects, and skills. These are tuned as one set and move together."""
 
@@ -327,16 +327,16 @@ it, sharpen it, or better it. This one line does most of the \
 repositioning work, because it tells the reader what to see before they read a single \
 bullet. Name the architecture or domain, not the category: "Distributed Block Storage \
 Engine", not "Backend Project".
-- technologies: the stack this project should be presented as built on, as **two to \
-five** entries. Take the direction's concepts seriously here; this list may differ \
+- technologies: the stack this project should be presented as built on, as **exactly \
+two** entries. Take the direction's concepts seriously here; this list may differ \
 substantially from the source project's, and a reader checks it against the subtitle \
-for consistency. Five is a hard limit, not a target: it sits on the same line as the \
-project name, and naming everything the project touched says less than naming the \
-few things that define it. Pick the ones this employer is scanning for.
+for consistency. Two is the whole budget: this sits on the same line as the project \
+name and its subtitle, and naming everything the project touched says less than \
+naming the two things that define it. Pick the two this employer is scanning for.
 
 Keep the subtitle and the technologies together under **70 characters**: they share \
 one line with the project name, and a heading that wraps costs a line the resume does \
-not have. Prefer three sharp technologies over five padded ones.
+not have.
 - bullets: exactly three.
 
 Make the three bullets do different jobs. One should establish the architecture: the \
