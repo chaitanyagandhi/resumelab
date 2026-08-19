@@ -281,25 +281,24 @@ def _education(
     *,
     include_gpa: bool,
 ) -> Iterable[Flowable]:
-    """Three lines per degree: the qualification, where it came from, what it covered.
+    """Three lines per degree: where it came from, what it was, what it covered.
 
-    The degree leads. It is what a reader is scanning this section *for*, and the
-    institution qualifies it rather than the other way round; leading with the
-    university buries the one fact the section exists to state.
+    The institution leads and the qualification sits beneath it, which is the order
+    the section had before the coursework line was added and the order it keeps.
     """
     for entry in entries:
         yield _flush_right_row(
-            _bold(_qualification(entry)),
+            _institution(entry),
             _date_text(entry.start_date, entry.end_date),
             stylesheet,
         )
         # Withheld and absent are the same thing on the page: the line is set without
         # a right-hand column rather than with an empty one.
         gpa = f"GPA: {entry.gpa}" if include_gpa and entry.gpa else ""
-        institution = _institution(entry)
-        if institution or gpa:
+        qualification = _qualification(entry)
+        if qualification or gpa:
             yield _flush_right_row(
-                institution,
+                _text(qualification),
                 gpa,
                 stylesheet,
                 leading_style="detail",
@@ -324,12 +323,12 @@ def _qualification(entry: Education) -> str:
 
 
 def _institution(entry: Education) -> str:
-    """Where the degree came from, set in italics with the separator outside them.
-
-    A separator inside an italic run is leaned along with the text around it, which
-    for a drawn glyph means it is sheared rather than styled.
-    """
-    parts = [f"<i>{_text(part)}</i>" for part in (entry.institution, entry.location) if part]
+    """The institution in bold, with its location alongside it in plain text."""
+    parts = []
+    if entry.institution:
+        parts.append(_bold(entry.institution))
+    if entry.location:
+        parts.append(_text(entry.location))
     return styles.SEPARATOR.join(parts)
 
 

@@ -296,12 +296,18 @@ def test_the_recorded_resume_still_carries_its_achievements(generated_resume):
 # --- education ------------------------------------------------------------
 
 
-def test_the_degree_leads_the_entry(extracted, generated_resume):
-    """What a reader scans this section for; the institution qualifies it."""
+def test_the_institution_leads_the_entry(extracted, generated_resume):
+    """The institution heads the entry and the qualification sits beneath it."""
     entry = generated_resume.education[0]
 
-    assert "MS Computer Science" in extracted
-    assert extracted.index("MS Computer Science") < extracted.index(entry.institution)
+    assert extracted.index(entry.institution) < extracted.index("MS Computer Science")
+
+
+def test_the_qualification_sits_above_the_coursework(extracted, generated_resume):
+    entry = generated_resume.education[0]
+
+    assert extracted.index("MS Computer Science") < extracted.index("Coursework:")
+    assert extracted.index(entry.institution) < extracted.index("Coursework:")
 
 
 def test_a_degree_with_no_known_abbreviation_is_left_as_written(tmp_path, generated_resume):
@@ -330,17 +336,28 @@ def test_coursework_is_rendered(extracted, generated_resume):
     assert f"Coursework: {', '.join(entry.coursework)}" in extracted
 
 
-def test_an_entry_with_only_a_degree_skips_the_line_beneath_it(tmp_path, generated_resume):
-    """No institution, no location, no GPA leaves nothing to set, so nothing is."""
+def test_an_entry_with_only_an_institution_skips_the_line_beneath_it(tmp_path, generated_resume):
+    """No qualification and no GPA leaves nothing to set, so nothing is set."""
     sparse = generated_resume.education[0].model_copy(
-        update={"institution": "", "location": None, "gpa": None, "coursework": ()}
+        update={"degree": "", "field": None, "gpa": None, "coursework": ()}
     )
     resume = generated_resume.model_copy(update={"education": (sparse,)})
 
     text = _flatten(_text_of(render_resume(resume, tmp_path / "sparse.pdf").path))
 
-    assert "MS Computer Science" in text
+    assert sparse.institution in text
     assert "GPA" not in text
+
+
+def test_an_entry_without_an_institution_still_renders_its_qualification(
+    tmp_path, generated_resume
+):
+    bare = generated_resume.education[0].model_copy(update={"institution": "", "location": None})
+    resume = generated_resume.model_copy(update={"education": (bare,)})
+
+    text = _flatten(_text_of(render_resume(resume, tmp_path / "no_school.pdf").path))
+
+    assert "MS Computer Science" in text
 
 
 def test_an_entry_without_coursework_skips_the_line(tmp_path, generated_resume):
