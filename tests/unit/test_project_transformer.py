@@ -354,3 +354,24 @@ def test_trimming_is_not_silently_skipped(recwarn):
 
     assert len(fitted.technologies) < 2
     assert [str(w.message) for w in recwarn.list] == []
+
+
+def test_the_prompt_rebuilds_the_project_in_the_employer_domain():
+    """The source project is a name and a shape, not a subject.
+
+    This reverses an instruction that asked for "a version of this project that could
+    plausibly have been built by the same person, not a different project wearing its
+    name". A different project wearing its name is exactly what is wanted: the
+    reference format turns the same three projects into ad infrastructure, payment
+    rails, or detection systems depending only on who is reading.
+    """
+    instructions = PROJECT_PROMPT.instructions
+
+    assert "Rebuild it inside this employer's domain" in instructions
+    assert "trace back to the original domain has not gone far enough" in instructions
+    assert "not a different project wearing its name" not in instructions
+
+
+def test_the_prompt_scales_figures_to_the_employer():
+    """A number sized for a side project describes a candidate nobody is hiring."""
+    assert "the scale this employer's own systems run at" in PROJECT_PROMPT.instructions

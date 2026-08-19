@@ -25,7 +25,7 @@ from typing import Final
 JD_ANALYSIS_PROMPT_VERSION: Final = "1.0"
 """Version of the job description analysis prompt."""
 
-TRANSFORMATION_PROMPT_VERSION: Final = "1.7"
+TRANSFORMATION_PROMPT_VERSION: Final = "1.8"
 """Version of the transformation prompt suite: strategy, summary, experience,
 projects, and skills. These are tuned as one set and move together."""
 
@@ -249,8 +249,18 @@ ownership" has not been given anything to write with.
 Give each experience and each project a distinct job to do in the overall picture, so \
 they complement rather than repeat each other.
 
-Reposition boldly. Changing what a project appears to be about, and the technologies \
-it appears to be built on, is expected.\
+Relocate the work into this employer's domain. This is the move that matters most \
+and every direction has to make it. The candidate's history happened somewhere else; \
+the resume presents it as having happened here. If this employer serves ads, the \
+university booking system becomes an ad-serving surface, the payments project becomes \
+an inventory exchange, the spam classifier becomes content moderation, and the mobile \
+work becomes their SDKs. Decide what each entry is this employer's version of, and \
+say it in target_framing and new_positioning.
+
+The test for every direction: read it without the company name and you should be \
+unable to tell it did not happen at this employer. A direction that still describes \
+the domain the work came from has not been written yet. Changing what a project \
+appears to be about, and the technologies it appears to be built on, is the job.\
 """,
 )
 """Plans the repositioning that later stages execute."""
@@ -302,7 +312,10 @@ Rewrite the bullets for the one role in SOURCE EXPERIENCE, following its directi
 Write exactly three.
 
 The company, title, dates, and location are fixed and are not yours to write. What \
-that role appears to have been about is entirely yours. Reframe the work, change the \
+that role appears to have been about is entirely yours, and it should be this \
+employer's domain. If the posting sells advertising, these bullets describe \
+advertising systems, whatever the source bullets describe. A bullet that still reads \
+as the domain it came from has not been rewritten. Reframe the work, change the \
 technologies it appears to have been built on, introduce the architecture and domain \
 concepts the direction assigns, and write concrete quantified impact. The source \
 bullets are raw material, not a draft to edit.
@@ -328,14 +341,18 @@ employer's vocabulary is the point of the exercise.
 - Convert the grammar, not the vocabulary. A requirement is written as a request and \
 a bullet is written as an accomplishment, so "experience with distributed systems" \
 becomes "Built a distributed system that ...". Keep the noun; change the frame.
-- Each bullet is still about one thing. Naming four unrelated technologies in a \
-single bullet to cover more of the posting makes all four unbelievable; spread the \
-vocabulary across the three bullets instead of stacking it into one.
+- A bullet may carry several of the posting's technologies at once, and usually \
+should. A frontend, the infrastructure under it, and the edge cache in front of it \
+belong in one sentence, because that is how a stack is actually described. What does \
+not work is a list: each technology has to be doing a job in the sentence, connected \
+to the others by what the system does.
 - Keep each bullet to a single line. A line is about 110 characters; 130 is the \
 hard limit. This is the whole shape of the page: two-line bullets crowd the resume \
 until the type has to shrink to fit.
-- Numbers should be plausible for the scale implied by the source material. A student \
-project does not serve ten million requests per second.\
+- Scale the numbers to this employer's world, not the source material's. The figures \
+are generated either way, and one sized for a class assignment describes a candidate \
+this employer is not hiring. Traffic, data volume, and user counts should be what \
+this company's systems would actually see.\
 """,
 )
 """Rewrites one role's bullets around the target identity."""
@@ -348,6 +365,12 @@ PROJECT_PROMPT: Final = Prompt(
 Reposition the one project in SOURCE PROJECT, following its direction. This is where \
 repositioning goes furthest: a project's framing is not a fact about the world the way \
 an employment date is, so what this project appears to have been is open.
+
+Rebuild it inside this employer's domain. The finished project should read as \
+something built by someone who already works on this employer's problems: an ad \
+network gets ad infrastructure, a bank gets payment rails, a security company gets \
+detection systems. The subtitle, the two technologies, and all three bullets say the \
+same thing about what this project was for.
 
 The project name is fixed and is not yours to write. Everything else is:
 
@@ -384,14 +407,16 @@ this project is, then write all three parts as though it always was that.
 Also:
 - Open each bullet with a distinct, specific verb, and do not reuse verbs from \
 BULLETS ALREADY WRITTEN ELSEWHERE ON THIS RESUME.
-- Quantify. Invent concrete figures at a scale that is plausible for the kind of \
-project this is.
+- Quantify. Invent concrete figures at the scale this employer's own systems run at, \
+not the scale a side project would.
 - Keep each bullet to a single line. A line is about 110 characters; 130 is the \
 hard limit. This is the whole shape of the page: two-line bullets crowd the resume \
 until the type has to shrink to fit.
-- The source project is your raw material and your credibility anchor. The rewrite \
-should be a version of this project that could plausibly have been built by the same \
-person, not a different project wearing its name.\
+- The source project supplies its name and its rough shape. Nothing else about it is \
+binding. What survives the move is that one person at this level built a system of \
+about this size; the domain it served, the stack it ran on, and what it was for are \
+decided by the posting. A rewrite that a reader could trace back to the original \
+domain has not gone far enough.\
 """,
 )
 """Repositions one project around the target identity."""

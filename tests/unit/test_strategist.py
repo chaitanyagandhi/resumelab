@@ -72,6 +72,22 @@ def test_the_prompt_requires_the_posting_stack_to_be_placed(
     assert "including the ones the candidate has never touched" in system_prompt
 
 
+def test_the_prompt_relocates_the_work_into_the_employer_domain(
+    candidate_profile, job_analysis, client
+):
+    """The move the reference format makes and this one was not making.
+
+    Against an ad-network posting, a run left a university booking system reading as
+    a university booking system. Matching the posting's technologies is not enough
+    when every entry still announces the domain it came from.
+    """
+    build(candidate_profile, job_analysis, client)
+    system_prompt = client.last_call.system_prompt
+
+    assert "Relocate the work into this employer's domain" in system_prompt
+    assert "unable to tell it did not happen at this employer" in system_prompt
+
+
 def test_the_prompt_refuses_to_soften_a_named_technology(candidate_profile, job_analysis, client):
     """The observed failure was a term kept in name only.
 
