@@ -207,7 +207,33 @@ def test_the_prompt_states_the_selection_rule(
     assert "The job description decides what belongs here" in system_prompt
     assert "Only if the posting names fewer than 10" in system_prompt
     assert "raw material, not a checklist" in system_prompt
-    assert "Select and order; do not transcribe." in system_prompt
+    # Reversed deliberately: the section is read by keyword matching before a person
+    # sees it, and a near-synonym does not match.
+    assert "Take the posting's terms verbatim" in system_prompt
+    assert "do not transcribe" not in system_prompt
+
+
+def test_the_prompt_admits_entries_that_are_not_technologies(
+    candidate_profile, job_analysis, transformation_strategy, client
+):
+    """A phrase the posting leans on counts as a skill for this section's purposes."""
+    system_prompt = client.last_call.system_prompt if client.calls else SKILLS_PROMPT.system
+
+    assert "Entries do not have to be technologies" in system_prompt
+    assert "Omit proficiency ratings and years of experience" in system_prompt
+
+
+def test_the_prompt_asks_for_consistent_casing(
+    candidate_profile, job_analysis, transformation_strategy, client
+):
+    """Lifting the posting's words should not mean lifting its capitalisation.
+
+    A list mixing "GPU Nodes" with "throughput optimization" reads as pasted, which
+    is the one way this section can look worse than the selection behind it.
+    """
+    system_prompt = client.last_call.system_prompt if client.calls else SKILLS_PROMPT.system
+
+    assert "in the case a resume would use" in system_prompt
 
 
 # --- failure handling -----------------------------------------------------

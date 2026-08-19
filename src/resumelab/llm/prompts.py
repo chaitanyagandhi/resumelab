@@ -25,7 +25,7 @@ from typing import Final
 JD_ANALYSIS_PROMPT_VERSION: Final = "1.0"
 """Version of the job description analysis prompt."""
 
-TRANSFORMATION_PROMPT_VERSION: Final = "1.5"
+TRANSFORMATION_PROMPT_VERSION: Final = "1.6"
 """Version of the transformation prompt suite: strategy, summary, experience,
 projects, and skills. These are tuned as one set and move together."""
 
@@ -246,10 +246,14 @@ summary_direction.
 One or two lines. It is the first thing read, and it decides how everything below it \
 is interpreted, so it must establish the target technical identity immediately.
 
-Open with what this engineer is, not with wanting to be it. Name the concrete \
-technologies and problem domains that define the identity: the specific ones this \
-employer cares about, not a category label. A reader should finish the first clause \
-already knowing which kind of engineer this is.
+Open with what this engineer is, not with wanting to be it, and name it the way the \
+posting names the role it is hiring for. If the posting is for a Backend Engineer, \
+the summary opens "Backend Engineer"; a reader should finish the first two words \
+already looking at their own job title.
+
+After that, name the concrete technologies and problem domains that define the \
+identity, in the posting's own words: the specific ones this employer cares about, \
+not a category label.
 
 Never write any of these, or anything like them:
 - "Passionate software engineer seeking opportunities to..."
@@ -296,11 +300,17 @@ appears in BULLETS ALREADY WRITTEN ELSEWHERE ON THIS RESUME. Repeated verbs are 
 clearest signal of machine-written bullets.
 - Do not restate anything already claimed elsewhere on the resume. Each bullet earns \
 its space by adding something new.
-- Use the terms this entry's direction assigns. Do not reach for every keyword in the \
-job analysis; a bullet stuffed with unrelated technologies is not credible, and \
-credibility is what the transformation depends on.
-- Never copy phrasing from the job description. Requirements are written as requests; \
-bullets are written as accomplishments. Convert, do not quote.
+- Use the posting's own words for the things it names. Its languages, its tools, its \
+domain phrases, the products it builds, and the teams it names all belong in these \
+bullets in the form the posting writes them: a reader scanning for "workflow \
+scheduling" should find "workflow scheduling", not a synonym for it. Lifting the \
+employer's vocabulary is the point of the exercise.
+- Convert the grammar, not the vocabulary. A requirement is written as a request and \
+a bullet is written as an accomplishment, so "experience with distributed systems" \
+becomes "Built a distributed system that ...". Keep the noun; change the frame.
+- Each bullet is still about one thing. Naming four unrelated technologies in a \
+single bullet to cover more of the posting makes all four unbelievable; spread the \
+vocabulary across the three bullets instead of stacking it into one.
 - Keep each bullet to a single line. A line is about 110 characters; 130 is the \
 hard limit. This is the whole shape of the page: two-line bullets crowd the resume \
 until the type has to shrink to fit.
@@ -326,7 +336,8 @@ Three or four words is usually right. The direction proposes a title direction; 
 it, sharpen it, or better it. This one line does most of the \
 repositioning work, because it tells the reader what to see before they read a single \
 bullet. Name the architecture or domain, not the category: "Distributed Block Storage \
-Engine", not "Backend Project".
+Engine", not "Backend Project". Build it from the posting's vocabulary, so the project \
+appears to be an instance of the work this employer does.
 - technologies: the stack this project should be presented as built on, as **exactly \
 two** entries. Take the direction's concepts seriously here; this list may differ \
 substantially from the source project's, and a reader checks it against the subtitle \
@@ -397,15 +408,28 @@ profile but neither named by the posting nor adjacent to it does not go in, howe
 much of the profile that leaves out. It would be taking a slot from a skill this \
 employer is actually scanning for, and that trade is never worth making.
 
-Do not mirror the posting term for term either. A skills section that reproduces the \
-job description's keyword list in its own order is the most recognizable signature of \
-a machine-tailored resume. Select and order; do not transcribe.
+Take the posting's terms verbatim, in the posting's own words. This section is read \
+by keyword matching before a person ever sees it, and a near-synonym does not match. \
+If the posting says "Server Side Development", write "Server Side Development", not \
+"Backend Engineering".
 
-Prefer skills that also appear in the bullets written for this resume, so the \
-document does not name a technology in one place and omit it in the other. Where the \
+Entries do not have to be technologies. A phrase the posting uses to describe the \
+work, a named product or platform of the employer's, and a requirement written as a \
+capability all belong here if the posting leans on them: "Distributed Systems", \
+"Workflow Scheduling", "Computer Science Fundamentals", the employer's own product \
+name. If the posting treats it as something the candidate should bring, it is a skill \
+for the purposes of this section.
+
+Write each entry in the case a resume would use rather than the case the posting \
+happened to use: capitalise a proper noun as its owner does, and title-case a \
+multi-word phrase. A list that mixes "GPU Nodes" with "throughput optimization" \
+reads as pasted, which is the one way this section can look worse than it is.
+
+Prefer entries that also appear in the bullets written for this resume, so the \
+document does not name something in one place and omit it in the other. Where the \
 cap forces a choice, keep the one this employer is scanning for.
 
-Omit proficiency ratings, years of experience, and soft skills. List the skill.\
+Omit proficiency ratings and years of experience. Name the thing itself.\
 """,
 )
 """Builds the skills section around the target identity."""
