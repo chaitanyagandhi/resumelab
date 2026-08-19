@@ -26,12 +26,12 @@ from resumelab.pipeline import transform_projects
 SUBTITLE = "NVMe-oF Event Processing Engine"
 TECHNOLOGIES = ("Go", "Linux", "NVMe-oF")
 BULLETS = (
-    "Designed a shared-nothing ingestion architecture that fans writes across NVMe-oF "
-    "targets, sustaining 40k events per second per node.",
+    "Designed a shared-nothing ingestion path fanning writes across NVMe-oF "
+    "targets at 40k events per second.",
     "Implemented an idempotent replay log with content-addressed segments, making "
-    "recovery after a broker failure deterministic.",
-    "Measured end-to-end durability under injected disk faults, holding p99 commit "
-    "latency under 12ms across 200 simulated failures.",
+    "failure recovery deterministic.",
+    "Measured durability under injected disk faults, holding p99 commit latency "
+    "under 12ms across 200 runs.",
 )
 
 

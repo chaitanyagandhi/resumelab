@@ -22,12 +22,12 @@ from resumelab.models.resume import (
 from resumelab.pipeline import transform_experiences
 
 BULLETS = (
-    "Built a replication controller in Go that places volumes across 3,000 nodes, "
-    "cutting rebalance time from hours to under ten minutes.",
-    "Instrumented the NVMe write path with per-device latency histograms, surfacing "
-    "tail regressions before they reached customers.",
-    "Designed an erasure-coded storage tier on Linux that reduced capacity overhead "
-    "by 40% while holding p99 read latency flat.",
+    "Built a replication controller in Go placing volumes across 3,000 nodes, "
+    "cutting rebalance time to ten minutes.",
+    "Instrumented the NVMe write path with per-device histograms, surfacing tail "
+    "regressions before release.",
+    "Designed an erasure-coded storage tier on Linux, cutting capacity overhead "
+    "40% with p99 read latency flat.",
 )
 
 
@@ -80,7 +80,7 @@ def test_whitespace_is_collapsed():
 
 
 def test_an_over_long_bullet_is_rejected_so_the_model_rewrites_it():
-    with pytest.raises(ValidationError, match="at most 220 characters"):
+    with pytest.raises(ValidationError, match="at most 130 characters"):
         bullets("x" * (MAX_BULLET_CHARACTERS + 1), BULLETS[1], BULLETS[2])
 
 

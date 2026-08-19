@@ -70,8 +70,28 @@ what this candidate is being presented as, which is the thing under study.
 MIN_BULLET_CHARACTERS = 40
 """Below this a bullet cannot carry implementation, detail, and impact."""
 
-MAX_BULLET_CHARACTERS = 220
-"""Roughly two lines. Longer bullets are skimmed past on a one-page resume."""
+TARGET_BULLET_CHARACTERS = 110
+"""One line, measured rather than estimated.
+
+A bullet line is :data:`~resumelab.rendering.styles.CONTENT_WIDTH` less the hanging
+indent, and at body size that holds 105 to 117 characters of ordinary prose. This is
+what the prompts ask for, and it is the number that decides how the page reads: at
+this length the whole resume renders at full size, and every ten characters past it
+costs a layout scale until the type reaches the readability floor.
+"""
+
+MAX_BULLET_CHARACTERS = 130
+"""The backstop, about a fifth over the target.
+
+Not the goal. The goal is :data:`TARGET_BULLET_CHARACTERS`; this is the point past
+which a bullet is sent back to be rewritten. The gap between the two is deliberate:
+a cap set at the target would reject bullets that overshoot by a word, and spend an
+API call on each of them, which is the trade the house rule exists to avoid.
+
+It was 220 for most of this project's life, described as "roughly two lines" - which
+it is, and which is why every run overflowed, spent a condensing call, and still
+landed at the tightest layout the renderer permits.
+"""
 
 _LIST_MARKER = re.compile("^\\s*(?:[-*\\u2022\\u2013\\u2014]|\\d+[.)])\\s+")
 """A leading bullet glyph or numbering the renderer would draw a second time.

@@ -104,7 +104,7 @@ def test_the_budget_is_stated(generated_resume, client):
     user_prompt = client.last_call.user_prompt
     assert f"Return exactly {len(generated_resume.all_bullets)} bullets." in user_prompt
     assert "at most 300 characters" in user_prompt
-    assert "at most 220 characters" in user_prompt
+    assert "at most 130 characters" in user_prompt
 
 
 def test_a_tighter_budget_is_passed_through(generated_resume, client):

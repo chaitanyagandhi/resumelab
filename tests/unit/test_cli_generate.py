@@ -30,12 +30,12 @@ SUMMARY = (
     "and Java on Linux, close to NVMe devices and network storage protocols."
 )
 BULLETS = (
-    "Built a replication controller in Go that places volumes across 3,000 nodes, "
-    "cutting rebalance time from hours to under ten minutes.",
-    "Instrumented the NVMe write path with per-device latency histograms, surfacing "
-    "tail regressions before they reached customers.",
-    "Designed an erasure-coded storage tier on Linux that cut capacity overhead by "
-    "40% while holding p99 read latency flat.",
+    "Built a replication controller in Go placing volumes across 3,000 nodes, "
+    "cutting rebalance time to ten minutes.",
+    "Instrumented the NVMe write path with per-device histograms, surfacing tail "
+    "regressions before release.",
+    "Designed an erasure-coded storage tier on Linux, cutting capacity overhead "
+    "40% with p99 read latency flat.",
 )
 
 runner = CliRunner()

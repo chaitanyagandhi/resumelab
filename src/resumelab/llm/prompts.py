@@ -25,7 +25,7 @@ from typing import Final
 JD_ANALYSIS_PROMPT_VERSION: Final = "1.0"
 """Version of the job description analysis prompt."""
 
-TRANSFORMATION_PROMPT_VERSION: Final = "1.3"
+TRANSFORMATION_PROMPT_VERSION: Final = "1.4"
 """Version of the transformation prompt suite: strategy, summary, experience,
 projects, and skills. These are tuned as one set and move together."""
 
@@ -301,7 +301,9 @@ job analysis; a bullet stuffed with unrelated technologies is not credible, and 
 credibility is what the transformation depends on.
 - Never copy phrasing from the job description. Requirements are written as requests; \
 bullets are written as accomplishments. Convert, do not quote.
-- Keep each bullet to a single line, under 220 characters.
+- Keep each bullet to a single line. A line is about 110 characters; 130 is the \
+hard limit. This is the whole shape of the page: two-line bullets crowd the resume \
+until the type has to shrink to fit.
 - Numbers should be plausible for the scale implied by the source material. A student \
 project does not serve ten million requests per second.\
 """,
@@ -353,7 +355,9 @@ Also:
 BULLETS ALREADY WRITTEN ELSEWHERE ON THIS RESUME.
 - Quantify. Invent concrete figures at a scale that is plausible for the kind of \
 project this is.
-- Keep each bullet to a single line, under 220 characters.
+- Keep each bullet to a single line. A line is about 110 characters; 130 is the \
+hard limit. This is the whole shape of the page: two-line bullets crowd the resume \
+until the type has to shrink to fit.
 - The source project is your raw material and your credibility anchor. The rewrite \
 should be a version of this project that could plausibly have been built by the same \
 person, not a different project wearing its name.\

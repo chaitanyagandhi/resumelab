@@ -22,22 +22,24 @@ from resumelab.models.strategy import (
 
 REPO_ROOT = Path(__file__).resolve().parents[1]
 
+# One line each, which is what the pipeline now asks for. Fixtures that ran long
+# would exercise a shape the system no longer produces.
 EXPERIENCE_BULLETS = (
-    "Built a replication controller in Go that places volumes across 3,000 nodes, "
-    "cutting rebalance time from hours to under ten minutes.",
-    "Instrumented the NVMe write path with per-device latency histograms, surfacing "
-    "tail regressions before they reached customers.",
-    "Designed an erasure-coded storage tier on Linux that cut capacity overhead by "
-    "40% while holding p99 read latency flat.",
+    "Built a replication controller in Go placing volumes across 3,000 nodes, "
+    "cutting rebalance time to ten minutes.",
+    "Instrumented the NVMe write path with per-device histograms, surfacing tail "
+    "regressions before release.",
+    "Designed an erasure-coded storage tier on Linux, cutting capacity overhead "
+    "40% with p99 read latency flat.",
 )
 
 PROJECT_BULLETS = (
-    "Architected a shared-nothing ingestion path that fans writes across NVMe-oF "
-    "targets at 40k events per second per node.",
+    "Architected a shared-nothing ingestion path fanning writes across NVMe-oF "
+    "targets at 40k events per second.",
     "Implemented an idempotent replay log with content-addressed segments, making "
-    "broker-failure recovery deterministic.",
+    "failure recovery deterministic.",
     "Measured durability under injected disk faults, holding p99 commit latency "
-    "under 12ms across 200 simulated failures.",
+    "under 12ms across 200 runs.",
 )
 
 SETTINGS_ENV_VARS = (

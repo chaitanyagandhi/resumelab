@@ -13,6 +13,7 @@ from reportlab.lib.enums import TA_RIGHT
 from reportlab.pdfbase import pdfmetrics
 
 from resumelab.exceptions import PDFRenderingError, ResumeLabError
+from resumelab.models.resume import MAX_BULLET_CHARACTERS, TARGET_BULLET_CHARACTERS
 from resumelab.rendering import RenderOptions, ResumeSection, pdf_renderer, render_resume, styles
 from resumelab.rendering.styles import (
     LAYOUT_SCALES,
@@ -89,7 +90,7 @@ def test_content_that_already_fits_is_not_tightened(tmp_path, generated_resume):
 
 def test_slightly_overflowing_content_is_tightened_onto_one_page(tmp_path, generated_resume):
     """The conservative auto-fit: shrink type and spacing together, within limits."""
-    crowded = _with_extra_roles(generated_resume, count=4)
+    crowded = _with_extra_roles(generated_resume, count=5)
 
     result = render_resume(crowded, tmp_path / "crowded.pdf")
 
@@ -100,7 +101,7 @@ def test_slightly_overflowing_content_is_tightened_onto_one_page(tmp_path, gener
 
 def test_the_written_file_matches_the_chosen_layout(tmp_path, generated_resume):
     """Only the accepted attempt is written; the file is never a discarded draft."""
-    crowded = _with_extra_roles(generated_resume, count=4)
+    crowded = _with_extra_roles(generated_resume, count=5)
 
     result = render_resume(crowded, tmp_path / "crowded.pdf")
 
@@ -137,12 +138,35 @@ def test_overflow_is_logged_with_what_to_do_about_it(tmp_path, generated_resume,
 
 
 def test_tightening_is_logged(tmp_path, generated_resume, caplog):
-    crowded = _with_extra_roles(generated_resume, count=4)
+    crowded = _with_extra_roles(generated_resume, count=5)
 
     with caplog.at_level(logging.INFO, logger="resumelab.rendering.pdf_renderer"):
         render_resume(crowded, tmp_path / "crowded.pdf")
 
     assert "tightened layout" in caplog.text
+
+
+def test_a_bullet_at_the_target_length_occupies_one_line():
+    """The target is a measurement, not a preference.
+
+    This is the number the prompts state, and the reason the page reads the way it
+    does. Set it above what a line holds and every bullet wraps, the content
+    overflows, a condensing call is spent, and the type still ends up at the
+    readability floor. That is exactly what a 220 character budget produced.
+    """
+    bullet = build_stylesheet()["bullet"]
+    line_width = styles.CONTENT_WIDTH - bullet.leftIndent
+    # Ordinary prose rather than a repeated character, whose width is not typical.
+    prose = (
+        "delivered a service that processes requests for teams across the "
+        "business, holding latency low "
+    )
+    sample = (prose * 4)[:TARGET_BULLET_CHARACTERS]
+
+    width = pdfmetrics.stringWidth(sample, bullet.fontName, bullet.fontSize)
+
+    assert width <= line_width
+    assert TARGET_BULLET_CHARACTERS < MAX_BULLET_CHARACTERS
 
 
 def test_every_layout_scale_keeps_the_body_readable():
@@ -160,7 +184,7 @@ def test_tighter_scales_shrink_type_and_spacing_together():
 
 def test_a_tightened_resume_still_extracts_completely(tmp_path, generated_resume):
     """Fitting must not cost content: shrinking is a layout change, not an edit."""
-    crowded = _with_extra_roles(generated_resume, count=4)
+    crowded = _with_extra_roles(generated_resume, count=5)
 
     text = _text_of(render_resume(crowded, tmp_path / "crowded.pdf").path)
 
