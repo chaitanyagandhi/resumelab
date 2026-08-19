@@ -94,12 +94,35 @@ def register_fonts() -> None:
             pdfmetrics.registerFont(TTFont(name, str(_FONT_DIRECTORY / filename)))
 
 
-BODY_FONT_SIZE = 9.5
-NAME_FONT_SIZE = 19.0
-CONTACT_FONT_SIZE = 8.5
-SECTION_FONT_SIZE = 9.5
-ENTRY_FONT_SIZE = 9.5
-DETAIL_FONT_SIZE = 8.8
+BODY_FONT_SIZE = 10.0
+NAME_FONT_SIZE = 18.0
+CONTACT_FONT_SIZE = 9.0
+SECTION_FONT_SIZE = 11.0
+ENTRY_FONT_SIZE = 10.0
+DATE_FONT_SIZE = 9.0
+DETAIL_FONT_SIZE = 9.0
+"""The type scale, in points at full size.
+
+Read off a reference resume rather than chosen: the section headings are set a point
+above the body, the dates and the secondary lines a point below it, and the name is
+the only thing on the page that is much larger. The previous scale had the headings
+and the dates all at body size, which left the page with one texture and no
+hierarchy.
+
+The contact line is the exception. The reference sets it at the heading size, which
+it can afford because it lists four fields; this one lists five, and a location
+pushes the line past :data:`CONTENT_WIDTH` at anything above nine points. A wrapped
+contact line costs a whole line of the page and looks like an accident, so the size
+is held to what fits. Dropping the location would buy the larger size back.
+"""
+
+SECTION_TRACKING = 0.8
+"""Extra space between the letters of a section heading, in points at full size.
+
+Measured off the reference at :data:`SECTION_FONT_SIZE`, where it works out at about
+0.07em. Tracking is what makes a short word in capitals read as a label rather than
+as a shouted word, and it is the reason the headings there look deliberate.
+"""
 
 LEADING_RATIO = 1.22
 """Line spacing as a multiple of font size. Tight, but still readable."""
@@ -107,12 +130,16 @@ LEADING_RATIO = 1.22
 MIN_BODY_FONT_SIZE = 8.5
 """The floor. Below this a resume is harder to read than it is to fit."""
 
-LAYOUT_SCALES = (1.0, 0.96, 0.92, 0.895)
+_TIGHTEST_SCALE = MIN_BODY_FONT_SIZE / BODY_FONT_SIZE
+
+LAYOUT_SCALES = (1.0, 0.96, 0.92, _TIGHTEST_SCALE)
 """Progressively tighter layouts, tried in order until the content fits one page.
 
-The last entry is the tightest permitted: it holds the body text at
-:data:`MIN_BODY_FONT_SIZE`. Content that still overflows there is left to overflow
-rather than shrunk into something nobody will read.
+The last entry is the tightest permitted, and is derived rather than written down so
+that it always holds the body text at exactly :data:`MIN_BODY_FONT_SIZE`. It used to
+be a literal, which meant that changing the body size silently moved the floor.
+Content that still overflows there is left to overflow rather than shrunk into
+something nobody will read.
 """
 
 # --- colour -----------------------------------------------------------------
@@ -125,15 +152,21 @@ RULE_INK = HexColor("#999999")
 
 # --- spacing ----------------------------------------------------------------
 SPACE_AFTER_NAME = 1.5
-SPACE_AFTER_CONTACT = 7.0
-SPACE_BEFORE_SECTION = 7.5
+SPACE_AFTER_CONTACT = 8.0
+SPACE_BEFORE_SECTION = 9.0
 SPACE_AFTER_SECTION_HEADING = 3.0
-SPACE_BETWEEN_ENTRIES = 4.5
+SPACE_BETWEEN_ENTRIES = 6.5
 SPACE_AFTER_ENTRY_HEADING = 1.0
-SPACE_BETWEEN_BULLETS = 1.0
+SPACE_BETWEEN_BULLETS = 1.5
+"""Vertical rhythm. Entries are separated more than the lines inside them.
+
+The gap between two roles has to be clearly larger than the gap between a role's own
+bullets, or the section reads as one undifferentiated list. That relationship, not
+the absolute numbers, is what the values are chosen to hold.
+"""
 
 # --- rules and bullets ------------------------------------------------------
-RULE_THICKNESS = 0.6
+RULE_THICKNESS = 0.75
 RULE_SPACE_BEFORE = 1.0
 RULE_SPACE_AFTER = 3.0
 
@@ -284,6 +317,7 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
     body = _scaled(BODY_FONT_SIZE, scale)
     detail = _scaled(DETAIL_FONT_SIZE, scale)
     entry = _scaled(ENTRY_FONT_SIZE, scale)
+    date = _scaled(DATE_FONT_SIZE, scale)
 
     def style(name: str, **overrides: object) -> ParagraphStyle:
         """Apply the defaults shared by every style, so each entry states only its own."""
@@ -326,7 +360,7 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
         "date": style(
             "date",
             fontName=FONT_REGULAR,
-            fontSize=entry,
+            fontSize=date,
             leading=_leading(entry),
             alignment=TA_RIGHT,
             textColor=MUTED_INK,
@@ -342,6 +376,16 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
         "detail": style(
             "detail",
             fontName=FONT_ITALIC,
+            fontSize=detail,
+            leading=_leading(detail),
+            textColor=MUTED_INK,
+            spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING, scale),
+        ),
+        # Upright, because a whole line of italics is read as an aside. The
+        # qualification above it is the aside; the coursework is a list of facts.
+        "note": style(
+            "note",
+            fontName=FONT_REGULAR,
             fontSize=detail,
             leading=_leading(detail),
             textColor=MUTED_INK,

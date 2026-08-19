@@ -6,6 +6,7 @@ audience.
 """
 
 import logging
+import re
 
 import pytest
 from pypdf import PdfReader
@@ -167,6 +168,59 @@ def test_a_bullet_at_the_target_length_occupies_one_line():
 
     assert width <= line_width
     assert TARGET_BULLET_CHARACTERS < MAX_BULLET_CHARACTERS
+
+
+def test_the_contact_line_fits_on_one_line(generated_resume):
+    """A wrapped contact line costs a line of the page and reads as an accident.
+
+    It carries five fields including a location, which is what bounds its size. The
+    check is against a rendered contact line rather than a guess at its length.
+    """
+    line = pdf_renderer._contact_line(generated_resume.personal)
+    # Strip the markup the renderer adds; what is drawn is the text inside it.
+    drawn = re.sub(r"<[^>]+>", "", line)
+    contact = build_stylesheet()["contact"]
+
+    width = pdfmetrics.stringWidth(drawn, contact.fontName, contact.fontSize)
+
+    assert width <= styles.CONTENT_WIDTH
+
+
+def test_a_tracked_heading_still_extracts_as_one_word(extracted):
+    """The reason tracking is set on the text object rather than typed as spaces.
+
+    Letter-spacing a heading by putting spaces between its characters would make it
+    extract as ``S U M M A R Y``, which is exactly the kind of damage this format
+    exists to avoid. Character spacing moves the glyphs without touching the string.
+    """
+    for heading in ("SUMMARY", "EDUCATION", "EXPERIENCE", "PROJECTS", "SKILLS"):
+        assert heading in extracted
+        assert " ".join(heading) not in extracted
+
+
+def test_headings_are_actually_tracked(tmp_path, generated_resume):
+    """Read off the page's own instructions rather than a picture of it.
+
+    Rasterising to measure the ink would need a converter this project does not
+    depend on, and would tie the test to whichever one the machine happened to have.
+    The character-spacing operator is what tracking *is*, and it is right there.
+    """
+    rendered = render_resume(generated_resume, tmp_path / "tracked.pdf").path
+    content = PdfReader(rendered).pages[0].get_contents().get_data().decode("latin-1")
+
+    spacings = [float(value) for value in re.findall(r"([-\d.]+)\s+Tc\b", content)]
+
+    assert spacings, "no character spacing was set anywhere on the page"
+    assert max(spacings) == pytest.approx(styles.SECTION_TRACKING, abs=0.01)
+
+
+def test_tracking_scales_with_the_type(tmp_path, generated_resume):
+    """A fixed tracking would grow relative to the letters as the page tightened."""
+    roomy = pdf_renderer._scaled_tracking(build_stylesheet(1.0)["section"])
+    tight = pdf_renderer._scaled_tracking(build_stylesheet(LAYOUT_SCALES[-1])["section"])
+
+    assert tight < roomy
+    assert tight / roomy == pytest.approx(LAYOUT_SCALES[-1], abs=0.01)
 
 
 def test_every_layout_scale_keeps_the_body_readable():
@@ -543,6 +597,7 @@ def test_the_stylesheet_covers_every_role_the_renderer_uses():
         "date",
         "detail",
         "detail_right",
+        "note",
         "body",
         "bullet",
     }

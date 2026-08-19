@@ -305,9 +305,7 @@ def _education(
                 trailing_style="detail_right",
             )
         if entry.coursework:
-            yield Paragraph(
-                _text(f"Coursework: {', '.join(entry.coursework)}"), stylesheet["detail"]
-            )
+            yield Paragraph(_text(f"Coursework: {', '.join(entry.coursework)}"), stylesheet["note"])
 
 
 def _qualification(entry: Education) -> str:
@@ -382,13 +380,50 @@ def _skills(
     yield Paragraph(styles.SEPARATOR.join(_text(skill) for skill in skills), stylesheet["body"])
 
 
+# ReportLab ships no type information, so its Flowable is an untyped base.
+class TrackedHeading(Flowable):  # type: ignore[misc]
+    """One line of text drawn with extra space between its letters.
+
+    ReportLab's paragraph styles cannot letter-space, and doing it by putting spaces
+    between the characters would make the heading extract as ``S U M M A R Y``. This
+    sets the character spacing on the canvas instead, so the heading is still drawn
+    and still extracted as a single word.
+    """
+
+    def __init__(self, text: str, style: ParagraphStyle, tracking: float) -> None:
+        super().__init__()
+        self.text = text
+        self.style = style
+        self.tracking = tracking
+        self.spaceBefore = style.spaceBefore
+        self.spaceAfter = style.spaceAfter
+
+    def wrap(self, available_width: float, _available_height: float) -> tuple[float, float]:
+        self.height = self.style.leading
+        return available_width, self.height
+
+    def draw(self) -> None:
+        # Character spacing belongs to a text object rather than the canvas, which is
+        # also what keeps it from leaking into everything drawn afterwards.
+        # The baseline sits a font size below the top of the line, leaving the rest
+        # of the leading beneath it as the paragraph styles do.
+        text = self.canv.beginText(0, self.height - self.style.fontSize)
+        text.setFont(self.style.fontName, self.style.fontSize)
+        text.setFillColor(self.style.textColor)
+        text.setCharSpace(self.tracking)
+        text.textOut(self.text)
+        self.canv.drawText(text)
+
+
 def _section(
     title: str,
     body: list[Flowable],
     stylesheet: dict[str, ParagraphStyle],
 ) -> Iterable[Flowable]:
     """A titled section with a rule under its heading."""
-    yield Paragraph(_text(title.upper()), stylesheet["section"])
+    yield TrackedHeading(
+        title.upper(), stylesheet["section"], _scaled_tracking(stylesheet["section"])
+    )
     yield HRFlowable(
         width="100%",
         thickness=styles.RULE_THICKNESS,
@@ -397,6 +432,15 @@ def _section(
         spaceAfter=styles.RULE_SPACE_AFTER,
     )
     yield from body
+
+
+def _scaled_tracking(section: ParagraphStyle) -> float:
+    """Tracking scaled with the type, so the headings keep their proportions.
+
+    Expressed against the heading's own size rather than the layout scale, which the
+    stylesheet has already applied by the time this sees it.
+    """
+    return float(styles.SECTION_TRACKING * section.fontSize / styles.SECTION_FONT_SIZE)
 
 
 def _bullet(text: str, stylesheet: dict[str, ParagraphStyle]) -> Paragraph:
