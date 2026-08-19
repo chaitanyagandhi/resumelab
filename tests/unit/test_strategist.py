@@ -55,6 +55,45 @@ def test_the_versioned_prompt_is_used_verbatim(candidate_profile, job_analysis, 
     assert client.last_call.purpose == "transformation_strategy"
 
 
+def test_the_prompt_requires_the_posting_stack_to_be_placed(
+    candidate_profile, job_analysis, client
+):
+    """The strategy is where keyword coverage was being lost.
+
+    A real run against a posting naming eighteen technologies produced a plan
+    carrying eight, with the rest replaced by things the candidate already had. The
+    later stages can only write what the plan hands them, so a term dropped here is
+    a term the resume can never match on.
+    """
+    build(candidate_profile, job_analysis, client)
+    system_prompt = client.last_call.system_prompt
+
+    assert "goes into at least one direction's jd_terms_to_incorporate" in system_prompt
+    assert "including the ones the candidate has never touched" in system_prompt
+
+
+def test_the_prompt_refuses_to_soften_a_named_technology(candidate_profile, job_analysis, client):
+    """The observed failure was a term kept in name only.
+
+    That run turned "ClickHouse" into "ClickHouse-adjacent data pipeline experience",
+    which matches no search for ClickHouse and reads as a hedge.
+    """
+    build(candidate_profile, job_analysis, client)
+
+    assert "is how a term gets dropped while appearing to be kept" in client.last_call.system_prompt
+
+
+def test_the_prompt_separates_named_things_from_working_styles(
+    candidate_profile, job_analysis, client
+):
+    """Directions were coming back holding only soft phrases and nothing to write with."""
+    build(candidate_profile, job_analysis, client)
+
+    assert "Working styles and soft phrases belong in concepts_to_emphasize" in (
+        client.last_call.system_prompt
+    )
+
+
 def test_both_the_profile_and_the_analysis_are_supplied(candidate_profile, job_analysis, client):
     build(candidate_profile, job_analysis, client)
 

@@ -25,7 +25,7 @@ from typing import Final
 JD_ANALYSIS_PROMPT_VERSION: Final = "1.0"
 """Version of the job description analysis prompt."""
 
-TRANSFORMATION_PROMPT_VERSION: Final = "1.6"
+TRANSFORMATION_PROMPT_VERSION: Final = "1.7"
 """Version of the transformation prompt suite: strategy, summary, experience,
 projects, and skills. These are tuned as one set and move together."""
 
@@ -219,15 +219,35 @@ belong there specifically, not everywhere.
 exactly. new_positioning says what the project should now appear to be. \
 possible_title_direction proposes a subtitle aimed at this role. \
 concepts_to_incorporate lists the technical ideas to build the rewrite around.
-- skills_priority: the skills that should lead, ordered by how much they matter to \
-this employer.
+- skills_priority: the posting's own stack, written the way the posting writes it, \
+ordered by how prominent it is there. Take the job analysis's core_languages, \
+frameworks, infrastructure, databases, and high_value_keywords and put them in this \
+list. All of them, including the ones the candidate has never touched: what the \
+resume claims is decided later, and a term missing from here cannot be claimed at \
+all. Only when the posting names fewer than twenty do you add anything the candidate \
+already has, and those go last. Never soften a term into a description of something \
+adjacent to it: "ClickHouse" belongs here, "ClickHouse-adjacent data pipeline \
+experience" is how a term gets dropped while appearing to be kept.
 - tone: the register the writing should hold throughout.
 - overall_strategy: the reasoning connecting these choices, in a few sentences.
 
-Distribute the job description's vocabulary deliberately. Every bullet reaching for \
-every keyword reads as keyword stuffing and is the failure mode to avoid; assign each \
-concept where it is most credible. Give each experience and each project a distinct \
-job to do in the overall picture, so they complement rather than repeat each other.
+Place all of the job description's vocabulary, and place it deliberately. There are \
+two failure modes here and they pull in opposite directions. One bullet reaching for \
+every keyword makes all of them unbelievable. But a technology the posting named and \
+the resume never mentions is simply a term this candidate does not match on, and \
+across six entries and eighteen bullets there is room for all of them.
+
+So: every named language, framework, database, and piece of infrastructure in the job \
+analysis goes into at least one direction's jd_terms_to_incorporate. Group them the \
+way they are actually used together, and give each group to the entry where it is \
+most credible: the infrastructure to the role that ran things, the data stores to the \
+one that moved data. jd_terms_to_incorporate is for those concrete named things. \
+Working styles and soft phrases belong in concepts_to_emphasize instead, and a \
+direction whose jd_terms_to_incorporate holds only phrases like "end-to-end \
+ownership" has not been given anything to write with.
+
+Give each experience and each project a distinct job to do in the overall picture, so \
+they complement rather than repeat each other.
 
 Reposition boldly. Changing what a project appears to be about, and the technologies \
 it appears to be built on, is expected.\
@@ -396,12 +416,17 @@ engineer is being presented.
 The job description decides what belongs here. Work in this order:
 1. Take the skills the posting itself names: its languages, frameworks, \
 infrastructure, databases, and the tools named in its requirements and its bonus \
-requirements. These come first and they fill most of the list. If the posting names \
-20 or more, the section is those 20 and you are done.
-2. Only if the posting names fewer than 10, make up the difference with skills that a \
-person doing this job would be expected to have: the same stack, the same layer of \
-the system, the adjacent tool. The candidate's existing profile is one source for \
-these, and it ranks below anything the posting asked for.
+requirements. The strategy's skills_priority already lists these in order. Fill the \
+section from it, from the top, until you reach 20 or run out. If it holds 20 or more, \
+the section is its first 20 and you are done.
+2. Only if the posting and the strategy together name fewer than 10 do you make up \
+the difference with skills a person doing this job would be expected to have: the \
+same stack, the same layer of the system, the adjacent tool. The candidate's existing \
+profile is one source for these, and it ranks below anything the posting asked for.
+
+Name every part of a named stack separately. A posting listing "LGTM (Loki, Grafana, \
+Tempo, Mimir)" is naming five things a reader may search for, and one entry saying \
+"LGTM" matches one of them.
 
 The profile's skill list is raw material, not a checklist. A skill that is in the \
 profile but neither named by the posting nor adjacent to it does not go in, however \
@@ -425,9 +450,9 @@ happened to use: capitalise a proper noun as its owner does, and title-case a \
 multi-word phrase. A list that mixes "GPU Nodes" with "throughput optimization" \
 reads as pasted, which is the one way this section can look worse than it is.
 
-Prefer entries that also appear in the bullets written for this resume, so the \
-document does not name something in one place and omit it in the other. Where the \
-cap forces a choice, keep the one this employer is scanning for.
+Where the cap forces a choice, keep the one this employer is scanning for. A skill \
+the posting named belongs here whether or not a bullet mentions it: the bullets have \
+their own budget, and this section is the one a keyword filter reads.
 
 Omit proficiency ratings and years of experience. Name the thing itself.\
 """,

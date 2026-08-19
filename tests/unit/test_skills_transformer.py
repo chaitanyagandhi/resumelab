@@ -205,7 +205,11 @@ def test_the_prompt_states_the_selection_rule(
     assert "Between 10 and 20 skills" in system_prompt
     assert "No categories" in system_prompt
     assert "The job description decides what belongs here" in system_prompt
-    assert "Only if the posting names fewer than 10" in system_prompt
+    assert "Only if the posting and the strategy together name fewer than 10" in system_prompt
+    # The strategy's ordered list is the source, so the section cannot quietly fall
+    # back to the profile while the posting still has terms left to give.
+    assert "skills_priority already lists these in order" in system_prompt
+    assert "Name every part of a named stack separately" in system_prompt
     assert "raw material, not a checklist" in system_prompt
     # Reversed deliberately: the section is read by keyword matching before a person
     # sees it, and a near-synonym does not match.
