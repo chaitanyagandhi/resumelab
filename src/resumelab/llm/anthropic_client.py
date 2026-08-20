@@ -40,7 +40,7 @@ from pydantic import BaseModel
 from resumelab.config import LLMProvider, Settings
 from resumelab.exceptions import LLMGenerationError
 from resumelab.llm.base import MalformedResponseError, RetryingLLMClient
-from resumelab.llm.client import TokenUsage
+from resumelab.llm.usage import metering_http_client
 
 if TYPE_CHECKING:
     from resumelab.llm.client import LLMClient
@@ -87,6 +87,10 @@ class AnthropicClient(RetryingLLMClient):
             api_key=settings.api_key_for(LLMProvider.ANTHROPIC).get_secret_value(),
             timeout=settings.llm_timeout_seconds,
             max_retries=0,
+            # Metered on the wire; a response that fails to parse is still billed.
+            http_client=metering_http_client(
+                self._record_usage, timeout=settings.llm_timeout_seconds
+            ),
         )
 
     @property
@@ -120,17 +124,6 @@ class AnthropicClient(RetryingLLMClient):
             messages=self._build_messages(user_prompt, repair_hint),
             output_config={"effort": self._settings.anthropic_effort},
             output_format=response_model,
-        )
-
-        usage = getattr(message, "usage", None)
-        prompt_tokens = getattr(usage, "input_tokens", 0) or 0
-        completion_tokens = getattr(usage, "output_tokens", 0) or 0
-        self._record_usage(
-            TokenUsage(
-                prompt_tokens=prompt_tokens,
-                completion_tokens=completion_tokens,
-                total_tokens=prompt_tokens + completion_tokens,
-            )
         )
 
         self._check_stop_reason(message, purpose)

@@ -170,41 +170,9 @@ def test_the_adapter_satisfies_the_client_protocol(build_client):
 # --- usage accounting -----------------------------------------------------
 
 
-def test_token_usage_accumulates_across_calls(build_client):
-    client, _ = build_client(
-        [
-            completion(parsed=Answer(verdict="a"), usage=(10, 5, 15)),
-            completion(parsed=Answer(verdict="b"), usage=(20, 10, 30)),
-        ]
-    )
-
-    generate(client)
-    generate(client)
-
-    assert client.stats.call_count == 2
-    assert client.stats.usage == TokenUsage(prompt_tokens=30, completion_tokens=15, total_tokens=45)
-
-
-def test_a_response_without_usage_still_counts_as_a_call(build_client):
-    client, _ = build_client([completion(parsed=Answer(verdict="ok"), usage=None)])
-
-    generate(client)
-
-    assert client.stats.call_count == 1
-    assert client.stats.usage == TokenUsage()
-
-
-def test_retried_attempts_are_counted_so_cost_is_not_understated(build_client):
-    client, _ = build_client(
-        [
-            api_error(RateLimitError, 429),
-            completion(parsed=Answer(verdict="ok")),
-        ]
-    )
-
-    generate(client)
-
-    assert client.stats.call_count == 1  # the failed attempt reported no usage
+# Token accounting is metered on the HTTP response, below the stub SDK these tests
+# drive, so it is exercised in test_llm_usage.py against a real client and a mock
+# transport instead.
 
 
 def test_stats_start_empty(build_client):

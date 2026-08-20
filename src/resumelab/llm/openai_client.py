@@ -37,7 +37,7 @@ from pydantic import BaseModel
 from resumelab.config import LLMProvider, Settings
 from resumelab.exceptions import LLMGenerationError
 from resumelab.llm.base import MalformedResponseError, RetryingLLMClient
-from resumelab.llm.client import TokenUsage
+from resumelab.llm.usage import metering_http_client
 
 if TYPE_CHECKING:
     from resumelab.llm.client import LLMClient
@@ -83,6 +83,11 @@ class OpenAIClient(RetryingLLMClient):
             api_key=settings.api_key_for(LLMProvider.OPENAI).get_secret_value(),
             timeout=settings.llm_timeout_seconds,
             max_retries=0,
+            # Usage is metered here rather than after the call returns, because a
+            # response that fails schema validation never gets that far. See usage.py.
+            http_client=metering_http_client(
+                self._record_usage, timeout=settings.llm_timeout_seconds
+            ),
         )
 
     @property
@@ -125,15 +130,6 @@ class OpenAIClient(RetryingLLMClient):
             raise LLMGenerationError(
                 f"The provider's content filter blocked the response for {purpose}."
             ) from exc
-
-        usage = getattr(completion, "usage", None)
-        self._record_usage(
-            TokenUsage(
-                prompt_tokens=getattr(usage, "prompt_tokens", 0) or 0,
-                completion_tokens=getattr(usage, "completion_tokens", 0) or 0,
-                total_tokens=getattr(usage, "total_tokens", 0) or 0,
-            )
-        )
 
         message = completion.choices[0].message
         if message.refusal:

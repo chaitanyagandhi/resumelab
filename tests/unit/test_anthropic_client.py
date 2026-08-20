@@ -22,7 +22,7 @@ from pydantic import BaseModel, ValidationError
 
 from resumelab.config import Settings
 from resumelab.exceptions import LLMGenerationError
-from resumelab.llm import AnthropicClient, LLMCallStats, TokenUsage
+from resumelab.llm import AnthropicClient, LLMCallStats
 
 API_KEY = "sk-ant-test-not-a-real-key"
 
@@ -180,36 +180,9 @@ def test_the_adapter_satisfies_the_client_protocol(build_client):
 # --- usage accounting -----------------------------------------------------
 
 
-def test_token_usage_accumulates_across_calls(build_client):
-    client, _ = build_client(
-        [
-            message(parsed=Answer(verdict="a"), usage=(10, 5)),
-            message(parsed=Answer(verdict="b"), usage=(20, 10)),
-        ]
-    )
-
-    generate(client)
-    generate(client)
-
-    assert client.stats.call_count == 2
-    assert client.stats.usage == TokenUsage(prompt_tokens=30, completion_tokens=15, total_tokens=45)
-
-
-def test_total_tokens_are_derived_because_the_provider_reports_only_the_parts(build_client):
-    client, _ = build_client([message(parsed=Answer(verdict="ok"), usage=(7, 3))])
-
-    generate(client)
-
-    assert client.stats.usage.total_tokens == 10
-
-
-def test_a_response_without_usage_still_counts_as_a_call(build_client):
-    client, _ = build_client([message(parsed=Answer(verdict="ok"), usage=None)])
-
-    generate(client)
-
-    assert client.stats.call_count == 1
-    assert client.stats.usage == TokenUsage()
+# Token accounting is metered on the HTTP response, below the stub SDK these tests
+# drive, so it is exercised in test_llm_usage.py against a real client and a mock
+# transport instead.
 
 
 def test_stats_start_empty(build_client):
