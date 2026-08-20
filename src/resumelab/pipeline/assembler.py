@@ -19,7 +19,7 @@ from resumelab.models.resume import (
     GeneratedProject,
     GeneratedResume,
 )
-from resumelab.validation.resume_validator import validate_resume
+from resumelab.validation.resume_validator import inspect_resume
 
 logger = logging.getLogger(__name__)
 
@@ -59,12 +59,15 @@ def assemble_resume(
         skills=tuple(skills),
         achievements=profile.achievements,
     )
-    validate_resume(resume)
+    # Inspected, not gated. Whatever is wrong with it, a drawn resume can be read
+    # and edited; a refused one is only a message about work already paid for.
+    problems = inspect_resume(resume)
 
     logger.info(
-        "assembled resume experiences=%d projects=%d skills=%d",
+        "assembled resume experiences=%d projects=%d skills=%d notes=%d",
         len(resume.experiences),
         len(resume.projects),
         len(resume.skills),
+        len(problems),
     )
     return resume

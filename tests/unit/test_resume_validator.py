@@ -1,46 +1,67 @@
-"""Tests for the deterministic checks run before a resume is rendered."""
+"""Tests for the deterministic checks run over a finished resume.
+
+Every one of these reports; none of them refuses. A run that has paid for six
+generation stages must end with a resume the reader can look at and edit, whatever
+is wrong with it, so the checks say what is wrong and the pipeline carries on.
+"""
 
 import logging
+import re
 
 import pytest
 
-from resumelab.exceptions import ResumeLabError, ResumeValidationError
 from resumelab.models.candidate import PersonalDetails
 from resumelab.models.resume import (
     MAX_BULLET_CHARACTERS,
     MIN_BULLET_CHARACTERS,
     ResumeLimits,
 )
-from resumelab.validation import validate_resume
+from resumelab.validation import inspect_resume
 
 
 def replace(resume, **updates):
     return resume.model_copy(update=updates)
 
 
-def failures(resume) -> str:
-    with pytest.raises(ResumeValidationError) as exc_info:
-        validate_resume(resume)
-    return str(exc_info.value)
+def failures(resume, limits=None) -> str:
+    """Everything the inspection had to say, as one string to assert against."""
+    problems = inspect_resume(resume) if limits is None else inspect_resume(resume, limits)
+    assert problems, "expected the inspection to report something"
+    return "\n".join(problems)
 
 
 # --- the happy path -------------------------------------------------------
 
 
 def test_a_complete_resume_passes(generated_resume):
-    validate_resume(generated_resume)
+    assert inspect_resume(generated_resume) == []
 
 
-def test_validation_is_logged(generated_resume, caplog):
+def test_the_inspection_is_logged(generated_resume, caplog):
     with caplog.at_level(logging.INFO, logger="resumelab.validation.resume_validator"):
-        validate_resume(generated_resume)
+        inspect_resume(generated_resume)
 
-    assert "validating generated resume" in caplog.text
+    assert "inspecting generated resume" in caplog.text
 
 
-def test_errors_are_resumelab_errors(generated_resume):
-    with pytest.raises(ResumeLabError):
-        validate_resume(replace(generated_resume, summary="  "))
+def test_every_problem_is_logged_as_a_warning(generated_resume, caplog):
+    """The run continues, so the log is where a problem has to be visible."""
+    with caplog.at_level(logging.WARNING, logger="resumelab.validation.resume_validator"):
+        inspect_resume(replace(generated_resume, summary="  "))
+
+    assert "summary" in caplog.text
+
+
+def test_nothing_here_raises(generated_resume):
+    """The whole point. Six paid stages must not end in a refusal to draw."""
+    wrecked = replace(
+        generated_resume,
+        summary="  ",
+        personal=generated_resume.personal.model_copy(update={"name": "  "}),
+        skills=(),
+    )
+
+    assert inspect_resume(wrecked)
 
 
 # --- identity and contact -------------------------------------------------
@@ -70,7 +91,7 @@ def test_a_phone_alone_is_enough_contact(generated_resume):
         location=None,
     )
 
-    validate_resume(replace(generated_resume, personal=by_phone))
+    assert inspect_resume(replace(generated_resume, personal=by_phone)) == []
 
 
 # --- required sections ----------------------------------------------------
@@ -148,14 +169,25 @@ def test_an_empty_bullet_is_rejected(generated_resume, blank):
     assert "bullet 1 is empty" in failures(replace(generated_resume, experiences=(broken,)))
 
 
-@pytest.mark.parametrize("length", [MIN_BULLET_CHARACTERS - 1, MAX_BULLET_CHARACTERS + 1])
-def test_an_unreasonable_bullet_length_is_rejected(generated_resume, length):
+def test_a_bullet_that_will_wrap_is_reported(generated_resume):
+    """Reported so the reader knows what to shorten, not so the run stops."""
     experience = generated_resume.experiences[0]
-    broken = experience.model_copy(update={"bullets": ("x" * length, *experience.bullets[1:])})
-
-    assert f"expected between 40 and {MAX_BULLET_CHARACTERS}" in failures(
-        replace(generated_resume, experiences=(broken,))
+    long_one = experience.model_copy(
+        update={"bullets": ("x" * (MAX_BULLET_CHARACTERS + 1), *experience.bullets[1:])}
     )
+
+    assert "will wrap onto a second line" in failures(
+        replace(generated_resume, experiences=(long_one,))
+    )
+
+
+def test_a_bullet_too_short_to_carry_an_outcome_is_reported(generated_resume):
+    experience = generated_resume.experiences[0]
+    short_one = experience.model_copy(
+        update={"bullets": ("x" * (MIN_BULLET_CHARACTERS - 1), *experience.bullets[1:])}
+    )
+
+    assert "says little" in failures(replace(generated_resume, experiences=(short_one,)))
 
 
 def test_project_bullets_are_checked_too(generated_resume):
@@ -203,7 +235,12 @@ def test_control_characters_in_a_project_subtitle_are_rejected(generated_resume)
 
 def test_ordinary_unicode_is_not_flagged(generated_resume):
     """Accents, dashes, and symbols are normal resume content."""
-    validate_resume(replace(generated_resume, summary="José — builds ≥99.9% durable Go systems."))
+    assert (
+        inspect_resume(
+            replace(generated_resume, summary="José — builds ≥99.9% durable Go systems.")
+        )
+        == []
+    )
 
 
 # --- reporting ------------------------------------------------------------
@@ -234,54 +271,33 @@ def test_all_bullets_collects_the_whole_document(generated_resume):
 
 def test_the_default_budget_matches_what_generation_already_enforces(generated_resume):
     """Out of the box, nothing the stages produced can fail this check."""
-    validate_resume(generated_resume, ResumeLimits())
+    assert inspect_resume(generated_resume, ResumeLimits()) == []
 
 
 def test_a_tighter_summary_budget_is_enforced(generated_resume):
     limits = ResumeLimits(summary_max_characters=40)
 
-    with pytest.raises(ResumeValidationError, match="over the 40 allowed"):
-        validate_resume(generated_resume, limits)
+    assert re.search("over the 40 allowed", failures(generated_resume, limits))
 
 
-def test_a_bullet_over_the_line_budget_does_not_fail_the_resume(generated_resume, caplog):
-    """The budget is what the condenser aims at, not a condition of rendering.
-
-    Failing here would throw away a finished resume because one bullet takes two
-    lines. It is noted in the log and the run continues.
-    """
+def test_a_tighter_budget_is_reported_against(generated_resume):
+    """The budget is what the condenser aims at and what the report measures."""
     limits = ResumeLimits(bullet_max_characters=60)
 
-    with caplog.at_level("INFO", logger="resumelab.validation.resume_validator"):
-        validate_resume(generated_resume, limits)
-
-    assert "will wrap" in caplog.text
-
-
-def test_a_bullet_past_the_pathology_ceiling_still_fails(generated_resume):
-    """Three lines of prose in one bullet is a misread schema, not an overshoot."""
-    huge = generated_resume.experiences[0].model_copy(
-        update={"bullets": ("x" * (MAX_BULLET_CHARACTERS + 1),) * 3}
-    )
-    resume = generated_resume.model_copy(update={"experiences": (huge,)})
-
-    with pytest.raises(ResumeValidationError, match="expected between"):
-        validate_resume(resume)
+    assert "will wrap" in failures(generated_resume, limits)
 
 
 def test_a_configured_experience_bullet_count_is_enforced(generated_resume):
     """Configuration that cannot be honoured fails loudly rather than being ignored."""
     limits = ResumeLimits(experience_bullet_count=4)
 
-    with pytest.raises(ResumeValidationError, match="expected exactly 4"):
-        validate_resume(generated_resume, limits)
+    assert re.search("expected exactly 4", failures(generated_resume, limits))
 
 
 def test_a_configured_project_bullet_count_is_enforced(generated_resume):
     limits = ResumeLimits(project_bullet_count=2)
 
-    with pytest.raises(ResumeValidationError, match="expected exactly 2"):
-        validate_resume(generated_resume, limits)
+    assert re.search("expected exactly 2", failures(generated_resume, limits))
 
 
 def test_settings_supply_the_budget():

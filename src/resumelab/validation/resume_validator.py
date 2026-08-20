@@ -15,10 +15,8 @@ from __future__ import annotations
 
 import logging
 
-from resumelab.exceptions import ResumeValidationError
 from resumelab.models.candidate import REQUIRED_PROJECT_COUNT
 from resumelab.models.resume import (
-    MAX_BULLET_CHARACTERS,
     MIN_BULLET_CHARACTERS,
     GeneratedResume,
     ResumeLimits,
@@ -28,20 +26,24 @@ from resumelab.utils.text import control_characters
 logger = logging.getLogger(__name__)
 
 
-def validate_resume(resume: GeneratedResume, limits: ResumeLimits | None = None) -> None:
-    """Check ``resume`` is fit to render.
+def inspect_resume(resume: GeneratedResume, limits: ResumeLimits | None = None) -> list[str]:
+    """Report everything about ``resume`` that falls outside the run's budget.
+
+    Returns the problems rather than raising them. Nothing found here stops a resume
+    being drawn: an over-long bullet takes a second line, a thin section looks thin,
+    and a reader can see both and fix them. Refusing to render is the one outcome
+    that helps nobody, and it throws away every stage the run already paid for.
 
     Args:
         resume: The assembled resume.
         limits: The run's length budget. Defaults to the standard limits, which match
             the bounds the generation stages already enforce.
 
-    Raises:
-        ResumeValidationError: If any check fails. The message lists every problem
-            found, not just the first.
+    Returns:
+        One line per problem, in reading order. Empty when there is nothing to say.
     """
     budget = limits or ResumeLimits()
-    logger.info("validating generated resume")
+    logger.info("inspecting generated resume")
 
     problems: list[str] = []
     _check_identity(resume, problems)
@@ -51,18 +53,17 @@ def validate_resume(resume: GeneratedResume, limits: ResumeLimits | None = None)
     _check_bullets(resume, budget, problems)
     _check_text_hygiene(resume, problems)
 
-    if problems:
-        raise ResumeValidationError(
-            "The generated resume is not fit to render:\n"
-            + "\n".join(f"  - {problem}" for problem in problems)
-        )
+    for problem in problems:
+        logger.warning("resume: %s", problem)
 
     logger.debug(
-        "resume validated experiences=%d projects=%d bullets=%d",
+        "resume inspected experiences=%d projects=%d bullets=%d problems=%d",
         len(resume.experiences),
         len(resume.projects),
         len(resume.all_bullets),
+        len(problems),
     )
+    return problems
 
 
 def _check_identity(resume: GeneratedResume, problems: list[str]) -> None:
@@ -146,21 +147,15 @@ def _check_bullet_texts(
     for index, bullet in enumerate(bullets, start=1):
         if not bullet.strip():
             problems.append(f"{where} bullet {index} is empty")
-        elif not MIN_BULLET_CHARACTERS <= len(bullet) <= MAX_BULLET_CHARACTERS:
-            problems.append(
-                f"{where} bullet {index} is {len(bullet)} characters, expected between "
-                f"{MIN_BULLET_CHARACTERS} and {MAX_BULLET_CHARACTERS}"
-            )
         elif len(bullet) > budget.bullet_max_characters:
-            # Over the line budget but nowhere near unusable. This is a note, not a
-            # problem: the bullet wraps, the renderer tightens, and the condenser
-            # shortens it if the page still does not fit. Failing the run here would
-            # throw away a finished resume over a second line.
-            logger.info(
-                "%s bullet %d runs to %d characters and will wrap",
-                where,
-                index,
-                len(bullet),
+            problems.append(
+                f"{where} bullet {index} runs to {len(bullet)} characters and will "
+                f"wrap onto a second line; {budget.bullet_max_characters} fits one"
+            )
+        elif len(bullet) < MIN_BULLET_CHARACTERS:
+            problems.append(
+                f"{where} bullet {index} is only {len(bullet)} characters and says "
+                f"little; {MIN_BULLET_CHARACTERS} is the least that carries an outcome"
             )
 
 

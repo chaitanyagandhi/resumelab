@@ -4,7 +4,6 @@ import logging
 
 import pytest
 
-from resumelab.exceptions import ResumeValidationError
 from resumelab.pipeline import assemble_resume
 
 
@@ -72,14 +71,27 @@ def test_assembly_does_not_call_a_model(candidate_profile, parts):
 # --- validation is not optional -------------------------------------------
 
 
-def test_an_invalid_resume_cannot_be_assembled(candidate_profile, parts):
-    with pytest.raises(ResumeValidationError, match="summary is empty"):
-        assemble_resume(candidate_profile, **{**parts, "summary": "   "})
+def test_a_flawed_resume_is_still_assembled(candidate_profile, parts, caplog):
+    """Assembly reports; it does not refuse.
+
+    Everything upstream of this point has already been paid for. A resume with an
+    empty summary can be drawn, read, and fixed in the editor; one that was never
+    assembled can only be described in a log line.
+    """
+    with caplog.at_level(logging.WARNING, logger="resumelab.validation.resume_validator"):
+        resume = assemble_resume(candidate_profile, **{**parts, "summary": "   "})
+
+    # Whitespace is stripped by the model config; what matters is that it exists.
+    assert resume.summary == ""
+    assert "summary is empty" in caplog.text
 
 
-def test_the_project_count_is_enforced_at_assembly(candidate_profile, parts):
-    with pytest.raises(ResumeValidationError, match="exactly 3 projects"):
-        assemble_resume(candidate_profile, **{**parts, "projects": parts["projects"][:2]})
+def test_a_short_project_list_is_reported_rather_than_refused(candidate_profile, parts, caplog):
+    with caplog.at_level(logging.WARNING, logger="resumelab.validation.resume_validator"):
+        resume = assemble_resume(candidate_profile, **{**parts, "projects": parts["projects"][:2]})
+
+    assert len(resume.projects) == 2
+    assert "exactly 3 projects" in caplog.text
 
 
 # --- logging --------------------------------------------------------------

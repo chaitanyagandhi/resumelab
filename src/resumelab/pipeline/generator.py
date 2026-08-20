@@ -35,7 +35,7 @@ from resumelab.pipeline.skills_transformer import transform_skills
 from resumelab.pipeline.strategist import build_transformation_strategy
 from resumelab.pipeline.summary_generator import generate_summary
 from resumelab.rendering import RenderResult, render_resume
-from resumelab.validation import validate_resume
+from resumelab.validation import inspect_resume
 
 logger = logging.getLogger(__name__)
 
@@ -185,7 +185,7 @@ def _render_to_fit(
 
     logger.info("condensing to fit one page pages=%d", rendered.page_count)
     shortened = condense_resume(resume, client=client, limits=settings.resume_limits)
-    validate_resume(shortened, settings.resume_limits)
+    inspect_resume(shortened, settings.resume_limits)
 
     rendered = render_resume(shortened, run.pdf_path)
     if not rendered.fits_on_one_page:
