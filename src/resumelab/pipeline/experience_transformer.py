@@ -19,7 +19,11 @@ from resumelab.llm.client import LLMClient
 from resumelab.llm.prompts import EXPERIENCE_PROMPT
 from resumelab.models.analysis import JobAnalysis
 from resumelab.models.candidate import CandidateProfile, Experience
-from resumelab.models.resume import ExperienceBullets, GeneratedExperience
+from resumelab.models.resume import (
+    ExperienceBullets,
+    GeneratedExperience,
+    TolerantExperienceBullets,
+)
 from resumelab.models.strategy import ExperienceDirection, TransformationStrategy
 from resumelab.pipeline.context import (
     already_written_section,
@@ -103,6 +107,9 @@ def _rewrite_bullets(
         user_prompt=EXPERIENCE_PROMPT.user(*sections),
         response_model=ExperienceBullets,
         purpose=EXPERIENCE_PROMPT.name,
+        # If three attempts have not brought the bullets onto a line, take them
+        # long rather than lose the role and everything generated before it.
+        fallback_model=TolerantExperienceBullets,
     )
     return generated.bullets
 

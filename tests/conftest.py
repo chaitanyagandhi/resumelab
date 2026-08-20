@@ -78,6 +78,8 @@ class RecordedCall:
     user_prompt: str
     response_model: type
     purpose: str
+    fallback_model: type | None = None
+    """The relaxed schema the last attempt would ask for, if the stage supplies one."""
 
 
 class RecordingLLMClient:
@@ -98,13 +100,16 @@ class RecordingLLMClient:
     def model(self) -> str:
         return self._model
 
-    def generate_structured(self, *, system_prompt, user_prompt, response_model, purpose):
+    def generate_structured(
+        self, *, system_prompt, user_prompt, response_model, purpose, fallback_model=None
+    ):
         self.calls.append(
             RecordedCall(
                 system_prompt=system_prompt,
                 user_prompt=user_prompt,
                 response_model=response_model,
                 purpose=purpose,
+                fallback_model=fallback_model,
             )
         )
         self.stats = self.stats.record(TokenUsage(1, 1, 2))

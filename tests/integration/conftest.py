@@ -109,7 +109,9 @@ class DeterministicLLM:
         self.stats = LLMCallStats()
         self.calls: list[tuple[str, str]] = []
 
-    def generate_structured(self, *, system_prompt, user_prompt, response_model, purpose):
+    def generate_structured(
+        self, *, system_prompt, user_prompt, response_model, purpose, fallback_model=None
+    ):
         self.calls.append((purpose, user_prompt))
         self.stats = self.stats.record(TokenUsage(120, 60, 180))
 

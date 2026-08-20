@@ -20,7 +20,11 @@ from resumelab.llm.client import LLMClient
 from resumelab.llm.prompts import PROJECT_PROMPT
 from resumelab.models.analysis import JobAnalysis
 from resumelab.models.candidate import CandidateProfile, Project
-from resumelab.models.resume import GeneratedProject, ProjectContent
+from resumelab.models.resume import (
+    GeneratedProject,
+    ProjectContent,
+    TolerantProjectContent,
+)
 from resumelab.models.strategy import ProjectDirection, TransformationStrategy
 from resumelab.pipeline.context import (
     already_written_section,
@@ -113,6 +117,7 @@ def _reposition(
         user_prompt=PROJECT_PROMPT.user(*sections),
         response_model=ProjectContent,
         purpose=PROJECT_PROMPT.name,
+        fallback_model=TolerantProjectContent,
     )
 
 

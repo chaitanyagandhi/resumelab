@@ -19,6 +19,7 @@ from resumelab.models.resume import (
     TARGET_BULLET_CHARACTERS,
     ExperienceBullets,
     GeneratedExperience,
+    TolerantExperienceBullets,
 )
 from resumelab.pipeline import transform_experiences
 
@@ -354,3 +355,15 @@ def test_a_bullet_is_never_shortened_below_the_minimum():
 
     with pytest.raises(ValidationError, match=f"at most {MAX_BULLET_CHARACTERS} characters"):
         bullets((opening + rest).strip(), BULLETS[1], BULLETS[2])
+
+
+def test_the_relaxed_schema_still_rejects_an_empty_bullet():
+    """It relaxes the length and nothing else. An empty bullet is a content error."""
+    with pytest.raises(ValidationError, match="must not be empty"):
+        TolerantExperienceBullets(bullets=("   ", BULLETS[1], BULLETS[2]))
+
+
+def test_the_relaxed_schema_still_rejects_a_bullet_that_says_nothing():
+    """Too short remains a repair worth asking for, however long the retry took."""
+    with pytest.raises(ValidationError, match="at least"):
+        TolerantExperienceBullets(bullets=("Did work.", BULLETS[1], BULLETS[2]))

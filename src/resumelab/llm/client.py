@@ -69,6 +69,7 @@ class LLMClient(Protocol):
         user_prompt: str,
         response_model: type[T],
         purpose: str,
+        fallback_model: type[T] | None = None,
     ) -> T:
         """Generate a response validated against ``response_model``.
 

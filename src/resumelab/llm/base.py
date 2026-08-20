@@ -78,6 +78,7 @@ class RetryingLLMClient(ABC):
         user_prompt: str,
         response_model: type[T],
         purpose: str,
+        fallback_model: type[T] | None = None,
     ) -> T:
         """Generate a response validated against ``response_model``.
 
@@ -85,18 +86,30 @@ class RetryingLLMClient(ABC):
         fails schema validation is retried with the validation errors appended, so
         the model can repair its own output. Authentication and request errors fail
         immediately.
+
+        ``fallback_model`` is asked for on the final attempt instead of
+        ``response_model``. It is the same schema with the rules that are worth
+        asking twice for relaxed, so a run cannot end over a constraint the model has
+        already refused three times to satisfy. It costs no extra call: the last
+        attempt happens either way, and this decides what is done with its answer.
         """
         max_attempts = self._settings.llm_max_retries + 1
         repair_hint: str | None = None
         failure = "no attempt was made"
 
         for attempt in range(1, max_attempts + 1):
+            wanted = response_model
+            if fallback_model is not None and attempt == max_attempts:
+                wanted = fallback_model
+                logger.info(
+                    "asking for %s on the final attempt purpose=%s", wanted.__name__, purpose
+                )
             try:
                 return self._request(
                     system_prompt=system_prompt,
                     user_prompt=user_prompt,
                     repair_hint=repair_hint,
-                    response_model=response_model,
+                    response_model=wanted,
                     purpose=purpose,
                 )
             except self.fatal_errors as exc:

@@ -13,7 +13,8 @@ from pathlib import Path
 import pytest
 from pydantic import ValidationError
 
-from resumelab.exceptions import ResumeLabError, UnsafePathError
+from resumelab.config import Settings
+from resumelab.exceptions import LLMGenerationError, ResumeLabError, UnsafePathError
 from resumelab.llm import base
 from resumelab.llm.prompts import injection_markers
 from resumelab.loaders import load_job_description
@@ -22,6 +23,7 @@ from resumelab.models.resume import (
     MAX_BULLET_CHARACTERS,
     ExperienceBullets,
     GeneratedSummary,
+    TolerantExperienceBullets,
 )
 from resumelab.utils.errors import describe_validation_error
 from resumelab.utils.paths import ensure_within, prepare_output_file
@@ -354,3 +356,87 @@ def test_no_prompt_sent_to_the_model_contains_an_em_dash():
     ]
 
     assert offenders == []
+
+
+# --- a length can no longer end a run -------------------------------------
+
+
+class _WillNotShorten(base.RetryingLLMClient):
+    """A client whose model always answers too long, which is the case that ended runs."""
+
+    def __init__(self, settings):
+        super().__init__(settings, sleeper=lambda _seconds: None)
+        self.asked: list[type] = []
+
+    @property
+    def model(self) -> str:
+        return "fake-model-1"
+
+    def _api_key(self):
+        return "sk-test-not-a-real-key"
+
+    def _describe_fatal(self, exc, purpose):
+        return f"{purpose}: {exc}"
+
+    def _request(self, *, system_prompt, user_prompt, repair_hint, response_model, purpose):
+        self.asked.append(response_model)
+        long_bullet = "Owned infrastructure end to end across every environment " * 3
+        return response_model(bullets=(long_bullet, "b" * 60, "c" * 60))
+
+
+@pytest.fixture
+def stubborn_client():
+    return _WillNotShorten(Settings(_env_file=None, openai_api_key="sk-test-not-a-real-key"))
+
+
+def test_a_model_that_will_not_shorten_still_finishes_the_run(stubborn_client):
+    """The failure this replaces: 'at most 118 characters, got 124', four attempts,
+    every stage generated before it discarded.
+
+    The strict schema is asked for while there is any chance of a repair. The last
+    attempt asks for the relaxed one, so the worst case is a bullet that wraps.
+    """
+    client = stubborn_client
+
+    written = client.generate_structured(
+        system_prompt="s",
+        user_prompt="u",
+        response_model=ExperienceBullets,
+        purpose="experience",
+        fallback_model=TolerantExperienceBullets,
+    )
+
+    assert len(written.bullets[0]) > MAX_BULLET_CHARACTERS
+    assert client.asked[-1] is TolerantExperienceBullets
+
+
+def test_the_strict_schema_is_asked_for_until_the_last_attempt(stubborn_client):
+    """The relaxed schema is a safety net, not the thing being asked for.
+
+    If it were used earlier the model would never be pushed to the line, which is
+    what produced a run whose every bullet ran to a hundred and forty characters.
+    """
+    client = stubborn_client
+
+    client.generate_structured(
+        system_prompt="s",
+        user_prompt="u",
+        response_model=ExperienceBullets,
+        purpose="experience",
+        fallback_model=TolerantExperienceBullets,
+    )
+
+    assert client.asked[:-1] == [ExperienceBullets] * (len(client.asked) - 1)
+
+
+def test_without_a_fallback_the_run_still_fails(stubborn_client):
+    """Stages that have no relaxed form keep failing loudly, which is correct."""
+    client = stubborn_client
+
+    with pytest.raises(LLMGenerationError, match="Gave up generating"):
+        client.generate_structured(
+            system_prompt="s",
+            user_prompt="u",
+            response_model=ExperienceBullets,
+            purpose="experience",
+        )

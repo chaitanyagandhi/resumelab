@@ -225,6 +225,32 @@ BulletText = Annotated[str, AfterValidator(_normalize_bullet)]
 """One resume bullet, cleaned and bounded to a readable length."""
 
 
+def _tolerate_bullet(value: str) -> str:
+    """Clean a bullet without holding it to the line, for the last attempt only.
+
+    Everything :func:`_normalize_bullet` does except refusing an over-long bullet.
+    Whole trailing sentences still go where that helps; what cannot be shortened
+    cleanly is kept and allowed to wrap, which costs the page a line.
+
+    This is not the bound being abandoned. The bound is what makes a model write to
+    the line at all, and removing it once produced a run whose every bullet ran to a
+    hundred and forty characters. It stays in force for every attempt but the last,
+    and this exists so the last one cannot end the run.
+    """
+    collapsed = soften_dashes(" ".join(_LIST_MARKER.sub("", value).split()))
+    if not collapsed:
+        raise ValueError("must not be empty")
+    if len(collapsed) < MIN_BULLET_CHARACTERS:
+        raise ValueError(
+            f"must be at least {MIN_BULLET_CHARACTERS} characters, got {len(collapsed)}"
+        )
+    return _drop_trailing_sentences(collapsed, MAX_BULLET_CHARACTERS, MIN_BULLET_CHARACTERS)
+
+
+TolerantBulletText = Annotated[str, AfterValidator(_tolerate_bullet)]
+"""A bullet that may run past the line rather than cost the run."""
+
+
 def _reject_repeated_bullets(bullets: tuple[str, ...]) -> tuple[str, ...]:
     """Two identical bullets waste a third of a section, so they are worth repairing."""
     seen = {bullet.casefold() for bullet in bullets}
@@ -252,6 +278,17 @@ class ExperienceBullets(BaseModel):
                 f"got {len(self.bullets)}"
             )
         return self
+
+
+class TolerantExperienceBullets(ExperienceBullets):
+    """:class:`ExperienceBullets` with the line bound relaxed.
+
+    Used only on the final attempt. Everything else it checks - the count, the
+    repeats, the cleaning - still applies, because those are content errors a model
+    can act on precisely and a resume is worse without them.
+    """
+
+    bullets: Annotated[tuple[TolerantBulletText, ...], AfterValidator(_reject_repeated_bullets)]
 
 
 def _normalize_subtitle(value: str) -> str:
@@ -346,6 +383,16 @@ class ProjectContent(BaseModel):
                 f"got {len(self.bullets)}"
             )
         return self
+
+
+class TolerantProjectContent(ProjectContent):
+    """:class:`ProjectContent` with the line bound on its bullets relaxed.
+
+    Same reasoning as :class:`TolerantExperienceBullets`, and used the same way: on
+    the last attempt only, so a project that will not shorten cannot end the run.
+    """
+
+    bullets: Annotated[tuple[TolerantBulletText, ...], AfterValidator(_reject_repeated_bullets)]
 
 
 class GeneratedProject(BaseModel):
