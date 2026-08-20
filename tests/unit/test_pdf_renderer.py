@@ -227,6 +227,82 @@ def test_tracking_scales_with_the_type(tmp_path, generated_resume):
     assert tight / roomy == pytest.approx(LAYOUT_SCALES[-1], abs=0.01)
 
 
+# --- filling the page -----------------------------------------------------
+
+
+def test_short_content_is_opened_out_to_fill_the_page(tmp_path, generated_resume):
+    """A resume that stops two thirds down reads as unfinished, not as concise.
+
+    The gaps are widened rather than the type, because a font size decides where
+    every line wraps and a gap cannot.
+    """
+    thin = generated_resume.model_copy(update={"projects": generated_resume.projects[:1]})
+
+    result = render_resume(thin, tmp_path / "opened.pdf")
+
+    assert result.page_count == 1
+    assert result.spacing > 1.0
+
+
+def test_opening_out_never_costs_a_second_page(tmp_path, generated_resume):
+    """The search only accepts a layout that still fits, whatever it tried."""
+    for count in (1, 2, 3):
+        thin = generated_resume.model_copy(update={"projects": generated_resume.projects[:count]})
+
+        assert render_resume(thin, tmp_path / f"p{count}.pdf").page_count == 1
+
+
+def test_a_fuller_page_is_opened_out_less(tmp_path, generated_resume):
+    """The gaps take up whatever room is left, so more content means less of them."""
+    sparse = generated_resume.model_copy(update={"projects": generated_resume.projects[:1]})
+    full = _with_extra_roles(generated_resume, count=5)
+
+    opened = render_resume(sparse, tmp_path / "sparse.pdf")
+    crowded = render_resume(full, tmp_path / "full.pdf")
+
+    assert opened.spacing > crowded.spacing
+    assert crowded.page_count == 1
+
+
+def test_a_resume_that_overflows_is_not_opened_out(tmp_path, generated_resume):
+    """Nothing to fill: it already runs past the page it was given."""
+    far_too_much = _with_extra_roles(generated_resume, count=30)
+
+    result = render_resume(far_too_much, tmp_path / "over.pdf")
+
+    assert result.page_count > 1
+    assert result.spacing == 1.0
+
+
+def test_a_page_with_no_room_to_give_keeps_the_layout_it_had(
+    tmp_path, generated_resume, monkeypatch
+):
+    """Every opening tried spills to a second page, so the tight one is kept.
+
+    Forced rather than hunted for: the band where a page fits at its own spacing and
+    not one step above is narrow, and a test that has to find it would be measuring
+    the fixture rather than the fallback.
+    """
+    monkeypatch.setattr(styles, "SPACING_SCALES", (6.0, 5.0))
+
+    result = render_resume(generated_resume, tmp_path / "no_room.pdf")
+
+    assert result.page_count == 1
+    assert result.spacing == 1.0
+
+
+def test_spacing_moves_the_gaps_and_not_the_type():
+    """What makes the search safe: nothing it changes can rewrap a line."""
+    tight = build_stylesheet(1.0, 1.0)
+    opened = build_stylesheet(1.0, 1.5)
+
+    for role in ("body", "bullet", "section", "entry"):
+        assert opened[role].fontSize == tight[role].fontSize
+        assert opened[role].leading == tight[role].leading
+    assert opened["section"].spaceBefore > tight["section"].spaceBefore
+    assert opened["bullet"].spaceAfter > tight["bullet"].spaceAfter
+
+
 def test_every_layout_scale_keeps_the_body_readable():
     for scale in LAYOUT_SCALES:
         assert build_stylesheet(scale)["body"].fontSize >= MIN_BODY_FONT_SIZE

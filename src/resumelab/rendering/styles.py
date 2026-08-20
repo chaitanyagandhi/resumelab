@@ -150,6 +150,22 @@ Content that still overflows there is left to overflow rather than shrunk into
 something nobody will read.
 """
 
+SPACING_SCALES = (1.9, 1.7, 1.55, 1.4, 1.28, 1.16, 1.08)
+"""How far the vertical gaps may be opened out, tried largest first.
+
+Every entry is above one: the layout at one is what the search falls back to, so
+there is nothing to try there.
+
+A resume whose content stops two thirds of the way down does not look concise, it
+looks unfinished. Once the type size is settled the gaps are widened until the page
+is full, which is the same search run in the opposite direction.
+
+Only the gaps move. Type is fixed by then, and it has to be: a font size decides
+where every line wraps, so raising it can add lines and cost a page, which is why
+the scale ladder has no rung above 1.0. Widening a gap can only ever push content
+down, so the search over these is well behaved.
+"""
+
 # --- colour -----------------------------------------------------------------
 INK = HexColor("#111111")
 """Near-black rather than pure black; easier to read and prints identically."""
@@ -314,7 +330,7 @@ def _leading(size: float) -> float:
     return round(size * LEADING_RATIO, 2)
 
 
-def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
+def build_stylesheet(scale: float = 1.0, spacing: float = 1.0) -> dict[str, ParagraphStyle]:
     """Build every paragraph style the renderer uses.
 
     Args:
@@ -322,6 +338,10 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             to tighten the page when content slightly overflows. Type and spacing
             scale together, so the proportions of the page are preserved rather than
             the text being squeezed into unchanged whitespace.
+        spacing: Further multiplier on the vertical gaps only, used to open the page
+            out when the content leaves room at the bottom. Type is untouched, which
+            is what makes this safe to search over: changing a font size changes
+            where every line wraps, and changing a gap does not.
 
     Returns:
         Styles keyed by role: ``name``, ``contact``, ``section``, ``entry``,
@@ -344,7 +364,7 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             fontSize=_scaled(NAME_FONT_SIZE, scale),
             leading=_leading(_scaled(NAME_FONT_SIZE, scale)),
             alignment=TA_CENTER,
-            spaceAfter=_scaled(SPACE_AFTER_NAME, scale),
+            spaceAfter=_scaled(SPACE_AFTER_NAME * spacing, scale),
         ),
         "contact": style(
             "contact",
@@ -353,23 +373,23 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             leading=_leading(_scaled(CONTACT_FONT_SIZE, scale)),
             alignment=TA_CENTER,
             textColor=MUTED_INK,
-            spaceAfter=_scaled(SPACE_AFTER_CONTACT, scale),
+            spaceAfter=_scaled(SPACE_AFTER_CONTACT * spacing, scale),
         ),
         "section": style(
             "section",
             fontName=FONT_BOLD,
             fontSize=_scaled(SECTION_FONT_SIZE, scale),
             leading=_leading(_scaled(SECTION_FONT_SIZE, scale)),
-            spaceBefore=_scaled(SPACE_BEFORE_SECTION, scale),
-            spaceAfter=_scaled(SPACE_AFTER_SECTION_HEADING, scale),
+            spaceBefore=_scaled(SPACE_BEFORE_SECTION * spacing, scale),
+            spaceAfter=_scaled(SPACE_AFTER_SECTION_HEADING * spacing, scale),
         ),
         "entry": style(
             "entry",
             fontName=FONT_REGULAR,
             fontSize=entry,
             leading=_leading(entry),
-            spaceBefore=_scaled(SPACE_BETWEEN_ENTRIES, scale),
-            spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING, scale),
+            spaceBefore=_scaled(SPACE_BETWEEN_ENTRIES * spacing, scale),
+            spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING * spacing, scale),
         ),
         "date": style(
             "date",
@@ -393,7 +413,7 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             fontSize=detail,
             leading=_leading(detail),
             textColor=MUTED_INK,
-            spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING, scale),
+            spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING * spacing, scale),
         ),
         # Upright, because a whole line of italics is read as an aside. The
         # qualification above it is the aside; the coursework is a list of facts.
@@ -403,7 +423,7 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             fontSize=detail,
             leading=_leading(detail),
             textColor=MUTED_INK,
-            spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING, scale),
+            spaceAfter=_scaled(SPACE_AFTER_ENTRY_HEADING * spacing, scale),
         ),
         "body": style(
             "body",
@@ -421,6 +441,6 @@ def build_stylesheet(scale: float = 1.0) -> dict[str, ParagraphStyle]:
             bulletFontName=GLYPH_FONT_BOLD,
             bulletFontSize=_scaled(BULLET_FONT_SIZE, scale),
             bulletOffsetY=_scaled(BULLET_OFFSET_Y, scale),
-            spaceAfter=_scaled(SPACE_BETWEEN_BULLETS, scale),
+            spaceAfter=_scaled(SPACE_BETWEEN_BULLETS * spacing, scale),
         ),
     }

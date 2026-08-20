@@ -72,6 +72,9 @@ class RenderResult:
 
     page_count: int
 
+    spacing: float = 1.0
+    """How far the vertical gaps were opened to fill the page. 1.0 means not at all."""
+
     @property
     def fits_on_one_page(self) -> bool:
         return self.page_count == 1
@@ -121,6 +124,10 @@ def render_resume(
             break
         logger.debug("layout overflowed pages=%d scale=%.3f", page_count, candidate)
 
+    spacing = 1.0
+    if page_count == 1:
+        payload, spacing = _fill_the_page(resume, scale, chosen, payload)
+
     if page_count > 1:
         logger.warning(
             "resume does not fit one page at the tightest permitted layout "
@@ -133,19 +140,44 @@ def render_resume(
 
     _write(payload, output_path)
     logger.info(
-        "rendered PDF output=%s bytes=%d pages=%d scale=%.3f",
+        "rendered PDF output=%s bytes=%d pages=%d scale=%.3f spacing=%.2f",
         output_path,
         output_path.stat().st_size,
         page_count,
         scale,
+        spacing,
     )
-    return RenderResult(path=output_path, scale=scale, page_count=page_count)
+    return RenderResult(path=output_path, scale=scale, page_count=page_count, spacing=spacing)
+
+
+def _fill_the_page(
+    resume: GeneratedResume,
+    scale: float,
+    options: RenderOptions,
+    tight: bytes,
+) -> tuple[bytes, float]:
+    """Open the vertical gaps until the content reaches the foot of the page.
+
+    Content that stops two thirds of the way down reads as unfinished rather than
+    concise. The type size is already settled by the time this runs and is not
+    touched: it decides where every line wraps, so raising it can add lines and cost
+    a page. A wider gap only ever moves content down, so this search cannot surprise.
+
+    Falls back to the layout it was given, which already fits.
+    """
+    for spacing in styles.SPACING_SCALES:
+        payload, page_count = _build_document(resume, scale, options, spacing=spacing)
+        if page_count == 1:
+            logger.debug("opened the page out spacing=%.2f", spacing)
+            return payload, spacing
+    return tight, 1.0
 
 
 def _build_document(
     resume: GeneratedResume,
     scale: float,
     options: RenderOptions,
+    spacing: float = 1.0,
 ) -> tuple[bytes, int]:
     """Build the document in memory at ``scale``, returning its bytes and page count."""
     buffer = io.BytesIO()
@@ -161,7 +193,7 @@ def _build_document(
         author=resume.personal.name,
     )
     try:
-        document.build(list(_build_story(resume, styles.build_stylesheet(scale), options)))
+        document.build(list(_build_story(resume, styles.build_stylesheet(scale, spacing), options)))
     except LayoutError as exc:
         raise PDFRenderingError(
             f"The resume could not be laid out at scale {scale}: {exc}"
